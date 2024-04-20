@@ -51,7 +51,7 @@ Unity Easy Inject是一个Unity依赖注入（DI）框架，它可以帮助你�
 
 ### 1. 启动IoC容器
 
-请把`EasyInject/Controllers`目录下的`GlobalController`作为启动控制器，挂载在每一个场景下的启动物体上。
+请把`EasyInject/Controllers`目录下的`GlobalInitializer`作为启动控制器，挂载在每一个场景下的启动物体上。
 
 如果启动控制器的启动时间不对，导致IoC容器没有启动，请把DefaultExecutionOrder特性的参数设置为一个更低的数字。
 

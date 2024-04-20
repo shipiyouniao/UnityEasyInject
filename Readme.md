@@ -51,7 +51,7 @@ Currently, only decompression installation is supported. Please download the pro
 
 ### 1. Start the IoC Container
 
-Please use `GlobalController` in the `EasyInject/Controllers` directory as the startup controller and mount it on the startup object in each scene.
+Please use `GlobalInitializer` in the `EasyInject/Controllers` directory as the startup controller and mount it on the startup object in each scene.
 
 If the startup time of the startup controller is incorrect, causing the IoC container to not start, please set the parameter of the DefaultExecutionOrder attribute to a lower number.
 
