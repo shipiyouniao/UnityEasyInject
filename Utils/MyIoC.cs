@@ -47,8 +47,7 @@ namespace EasyInject.Utils
             {
                 var type = instance.GetType();
                 var beanName = type.GetCustomAttribute<BeanNameAttribute>();
-                var beanInfo = new BeanInfo(beanName != null ? beanName.Name : string.Empty, type);
-                _beans[beanInfo] = instance;
+                AddBean(beanName != null ? beanName.Name : string.Empty, instance, false);
             }
 
             OnAwakeCalled += action;
@@ -122,19 +121,12 @@ namespace EasyInject.Utils
             {
                 _instancesCount++;
             }
+            
             // 获得场景上所有挂载了BeanObject且isDefault为true的物体
             var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>().Where(bean => bean.isDefault).ToList();
             foreach (var beanObject in beanObjects)
             {
-                // // 如果隐藏了，就激活一下，以防万一
-                // if (!beanObject.gameObject.activeSelf)
-                // {
-                //     beanObject.gameObject.SetActive(true);
-                //     beanObject.gameObject.SetActive(false);
-                // }
-                
-                var beanInfo = new BeanInfo(beanObject.name, beanObject.GetType());
-                _beans[beanInfo] = beanObject;
+                AddBean(beanObject.name, beanObject, false);
                 _behaviours.Add(beanObject);
                 // 这里也需要把默认实例数加1
                 _instancesCount++;
@@ -308,12 +300,26 @@ namespace EasyInject.Utils
         /// </remarks>
         /// <param name="name">Bean的名字</param>
         /// <param name="instance">Bean的实例</param>
-        public void AddBean(string name, object instance)
+        /// <param name="startInject">是否立即注入</param>
+        public void AddBean(string name, object instance, bool startInject = true)
         {
             var beanInfo = new BeanInfo(name, instance.GetType());
             _beans[beanInfo] = instance;
+            
+            // 如果有实现接口，且接口不是Unity相关的接口，也要注册进IoC容器
+            var interfaces = instance.GetType().GetInterfaces();
+            foreach (var @interface in interfaces)
+            {
+                if (@interface.Namespace == null || @interface.Namespace.Contains("UnityEngine")) continue;
+                beanInfo = new BeanInfo(name, @interface);
+                _beans[beanInfo] = instance;
+            }
+            
 
-            Inject(instance);
+            if (startInject)
+            {
+                Inject(instance);
+            }
         }
         
         /// <summary>

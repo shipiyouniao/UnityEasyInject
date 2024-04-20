@@ -15,12 +15,13 @@
         * [字段注入获取Bean](#22-字段注入获取bean)
         * [构造函数注入获取Bean](#23-构造函数注入获取bean)
         * [Bean的名字](#24-Bean的名字)
-        * [基于里氏替换原则的Bean](#25-基于里氏替换原则的bean)
+        * [基于里氏替换原则的非游戏物体组件类Bean](#25-基于里氏替换原则的非游戏物体组件类bean)
     * [游戏物体对象](#3-游戏物体对象)
         * [注册或仅注入游戏物体组件类](#31-注册或仅注入游戏物体组件类)
         * [Bean的名字](#32-Bean的名字)
         * [场景初始化时存在的Bean](#33-场景初始化时存在的bean)
         * [注册没有编写游戏物体组件类的游戏对象](#34-注册没有编写游戏物体组件类的游戏对象)
+        * [基于里氏替换原则的游戏物体组件类Bean](#35-基于里氏替换原则的游戏物体组件类bean)
 * [未来计划](#未来计划)
 * [联系方式](#联系方式)
 
@@ -176,9 +177,9 @@ public class TestComponent6
 }
 ```
 
-#### 2.5 基于里氏替换原则的Bean
+#### 2.5 基于里氏替换原则的非游戏物体组件类Bean
 
-如果一个类继承了另一个类，或者实现了一个接口，那么这个类也会被注册为Bean。
+如果一个类继承了另一个类，或者实现了一个接口，那么父类或接口也会被注册为Bean。如果有多个子类，那么请务必在子类的`[Component]`当中指定名字。
 
 ***但是本框架并不会按照继承链进行注册，只会注册上一级的父类或接口。因此进行注入时，成员变量的类型至多为实现类的上一级类型。此外请保证父类并没有使用`[Component]`特性注册为Bean。***
 
@@ -274,11 +275,11 @@ public class TestMonoBehaviour3 : BeanMonoBehaviour
 
 考虑到生命周期的问题，在场景初始化时便存在的游戏物体组件单例（包括场景加载时默认隐藏的物体），可以使用`[DefaultInject]`特性，这样可以在IoC容器初始化时就注入。
 
-***但如果这样做的话，必须确保这个类是单例，并且需要被注入的字段也是单例，否则会导致不可预知的错误。***
+***但如果这样做的话，必须确保这个类是单例，并且需要被注入的字段也是标记了该特性的单例，否则会导致不可预知的错误。***
 
 请在参数中传入场景名称（不要带场景名之前的路径），场景之间用逗号隔开。
 
-使用了该特性的类如果在场景加载时没有被完成注册，则会产生错误抛出异常。没有使用该特性的类，由于会在场景加载过程中被注册为Bean，因此不会抛出异常。请针对游戏物体生成顺序进行合理的设计。
+使用了该特性的类如果在场景加载一开始没有被完成全部字段的注入，则会产生错误抛出异常。没有使用该特性的类，由于会在之后的过程中被注册为Bean，因此不会抛出异常。请针对游戏物体生成顺序进行合理的设计。
 
 ```csharp
 [DefaultInject("SampleScene", "SampleScene2")]
@@ -296,7 +297,7 @@ public class TestMonoBehaviour4 : BeanMonoBehaviour
 
 #### 3.4 注册没有编写游戏物体组件类的游戏对象
 
-如果您想要把没有编写游戏物体组件类的游戏对象注册为Bean，可以在物体上挂在`EasyInject/Behaviours/BeanObject`脚本。
+如果您想要把没有编写游戏物体组件类的游戏对象注册为Bean，可以在物体上挂载`EasyInject/Behaviours/BeanObject`脚本。
 
 这个脚本会把物体名称作为Name注册为Bean，因此在字段注入时，需要在`[Autowired]`特性中传入名字。
 
@@ -314,6 +315,56 @@ public class TestMonoBehaviour5 : BeanMonoBehaviour
     protected override void OnAwake()
     {
         testObject.SetActive(true);
+    }
+}
+```
+
+#### 3.5 基于里氏替换原则的游戏物体组件类Bean
+
+游戏物体组件类也可以基于里氏替换原则进行注册。如果有多个子实现类，那么请务必在子类的`[BeanName]`当中指定名字。
+
+由于组件类是必须继承`BeanMonoBehaviour`的，因此这里不会出现父类被注册为Bean的情况。
+
+***但是本框架并不会按照继承链进行注册，只会注册上一级的接口。因此进行注入时，成员变量的类型至多为实现类的上一级类型。***
+
+***但是如果接口是Unity相关的接口（命名空间包含`UnityEngine`），则这个接口会被略过。***
+
+```csharp
+public interface ISay
+{
+    void say();
+}
+
+[BeanName("TestMonoBehaviour6")]
+public class TestMonoBehaviour6 : BeanMonoBehaviour, ISay
+{
+    public void say()
+    {
+        Debug.Log("TestMonoBehaviour6");
+    }
+}
+
+[BeanName("TestMonoBehaviour7")]
+public class TestMonoBehaviour7 : BeanMonoBehaviour, ISay
+{
+    public void say()
+    {
+        Debug.Log("TestMonoBehaviour7");
+    }
+}
+
+public class TestMonoBehaviour8 : InjectableMonoBehaviour
+{
+    [Autowired("TestMonoBehaviour6")]
+    private ISay testMonoBehaviour6;
+    
+    [Autowired("TestMonoBehaviour7")]
+    private ISay testMonoBehaviour7;
+    
+    protected override void OnAwake()
+    {
+        testMonoBehaviour6.say();
+        testMonoBehaviour7.say();
     }
 }
 ```
