@@ -183,7 +183,7 @@ public class TestComponent6
 
 ***但是本框架并不会按照继承链进行注册，只会注册上一级的父类或接口。因此进行注入时，成员变量的类型至多为实现类的上一级类型。此外请保证父类并没有使用`[Component]`特性注册为Bean。***
 
-***此外，如果父类是`Object`，则不会被注册为Bean。因此依赖注入时，不要使用`Object`作为成员变量的类型。***
+***此外，如果父类是`Object`，则父类不会被注册为Bean。因此依赖注入时，不要使用`Object`作为成员变量的类型。***
 
 ```csharp
 public interface ITestService

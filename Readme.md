@@ -37,7 +37,7 @@ The usage of this framework is inspired by Spring Boot, so the usage is very sim
 
 However, since the project is still in its early stages, only class objects can be registered as Beans.
 
-The project is developed by a junior in the third year who has shifted from WEB to Unity, so there may be some shortcomings. Suggestions are welcome.
+The project is developed by a junior of a college who has shifted from WEB to Unity as a newcomer, so there may be some shortcomings. Suggestions are welcome.
 
 ---
 
