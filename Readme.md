@@ -314,7 +314,7 @@ If the object is an object that will be loaded at the beginning of the scene (in
 ```csharp
 public class TestMonoBehaviour5 : BeanMonoBehaviour
 {
-    // 这里的名字是物体的名字
+    // The name here is the name of the object
     [Autowired("TestObject")]
     private BeanObject testObject;
 
