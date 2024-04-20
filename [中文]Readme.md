@@ -22,6 +22,7 @@
         * [场景初始化时存在的Bean](#33-场景初始化时存在的bean)
         * [注册没有编写游戏物体组件类的游戏对象](#34-注册没有编写游戏物体组件类的游戏对象)
         * [基于里氏替换原则的游戏物体组件类Bean](#35-基于里氏替换原则的游戏物体组件类bean)
+        * [跨场景的Bean](#36-跨场景的bean)
 * [未来计划](#未来计划)
 * [联系方式](#联系方式)
 
@@ -93,6 +94,8 @@ public class TestComponent
 #### 2.2 字段注入获取Bean
 
 如果想使用字段注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`特性，或是继承了`BeanMonoBehaviour`或`InjectableMonoBehaviour`的游戏物体组件类。
+
+***由于普通对象是最开始被注册的，因此你不可以把游戏物体组件类的Bean注入到普通对象当中。***
 
 ```csharp
 [Component]
@@ -365,6 +368,58 @@ public class TestMonoBehaviour8 : InjectableMonoBehaviour
     {
         testMonoBehaviour6.say();
         testMonoBehaviour7.say();
+    }
+}
+```
+
+#### 3.6 跨场景的Bean
+
+如果您的游戏物体组件类是跨场景的，可以使用`[PersistAcrossScenes]`特性。请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
+
+场景之间共享的Bean：
+
+```csharp
+[PersistAcrossScenes]
+[DefaultInject("GameScene", "MenuScene")]
+public class TestAcrossScenes : BeanMonoBehaviour
+{
+    public string value = "Hello World!";
+    
+    protected override void OnAwake()
+    {
+        DontDestroyOnLoad(gameObject);
+    }
+}
+```
+
+在MenuScene场景中使用：
+
+```csharp
+[DefaultInject("MenuScene")]
+public class Test1 : InjectableMonoBehaviour
+{
+    [Autowired]
+    private TestAcrossScenes _testAcrossScenes;
+
+    protected override void OnAwake()
+    {
+        Debug.Log(_testAcrossScenes.value);
+    }
+}
+```
+
+在GameScene场景中使用：
+
+```csharp
+[DefaultInject("GameScene")]
+public class Test2 : InjectableMonoBehaviour
+{
+    [Autowired]
+    private TestAcrossScenes _testAcrossScenes;
+
+    protected override void OnAwake()
+    {
+        Debug.Log(_testAcrossScenes.value);
     }
 }
 ```

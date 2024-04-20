@@ -29,7 +29,7 @@ namespace EasyInject.Utils
 
         // 用于全部注入完成后的回调
         private event Action OnAwakeCalled;
-        
+
         // 默认需要注入的MonoBehavior是否已经全部注入
         public bool IsInjected { get; private set; }
 
@@ -68,7 +68,7 @@ namespace EasyInject.Utils
                 var instance = _behaviours[i];
                 Inject(instance);
             }
-            
+
             // 检查实例是否注入完成，如果没有，证明默认的不满足，抛出异常
             if (_shelvedInstances.Count > 0)
             {
@@ -76,7 +76,7 @@ namespace EasyInject.Utils
                 var ins = _shelvedInstances.First();
                 throw new Exception($"No service of type {ins.Key.GetType()} found for autowiring");
             }
-            
+
             IsInjected = true;
             OnAwakeCalled?.Invoke();
         }
@@ -87,13 +87,23 @@ namespace EasyInject.Utils
         public void Init()
         {
             // 清空IoC容器
+            var beansToKeep =
+                (from bean in _beans
+                    let type = bean.Value.GetType()
+                    where type.GetCustomAttribute<PersistAcrossScenesAttribute>() != null
+                    select bean).ToDictionary(bean => bean.Key, bean => bean.Value);
             _beans.Clear();
+            foreach (var bean in beansToKeep)
+            {
+                _beans.Add(bean.Key, bean.Value);
+            }
+
             _shelvedInstances.Clear();
             _behaviours.Clear();
             IsInjected = false;
             _instancesCount = 0;
             OnAwakeCalled = null;
-            
+
             InitNormalBean();
             GetDefaultMonoBehaviourInfo();
         }
@@ -103,34 +113,48 @@ namespace EasyInject.Utils
         /// </summary>
         private void GetDefaultMonoBehaviourInfo()
         {
+            // 获取场景名称，计算出场景中需要注入的MonoBehaviour实例数
+            var sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            var behaviours = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .Where(t => t.GetCustomAttributes(typeof(DefaultInjectAttribute), true).Length > 0)
+                .ToList();
+            foreach (var behaviour in from behaviour in behaviours
+                     let sceneNames = behaviour.GetCustomAttribute<DefaultInjectAttribute>().SceneNameList
+                     where sceneNames.Contains(sceneName)
+                     select behaviour)
+            {
+                // 如果在beans当中，就跳过（常常是因为包含PersistAcrossScenesAttribute特性）
+                var beanName = behaviour.GetCustomAttribute<BeanNameAttribute>();
+                var beanInfo = new BeanInfo(beanName != null ? beanName.Name : string.Empty, behaviour);
+                if (_beans.ContainsKey(beanInfo))
+                {
+                    continue;
+                }
+
+                _instancesCount++;
+            }
+
+            // 获得场景上所有挂载了BeanObject且isDefault为true的物体
+            var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>().Where(bean => bean.isDefault).ToList();
+            foreach (var beanObject in beanObjects)
+            {
+                // 这里也需要把默认实例数加1
+                _instancesCount++;
+                
+                AddBean(beanObject.name, beanObject, false);
+                _behaviours.Add(beanObject);
+            }
+            
             // 获得场景上所有被隐藏的物体，如果是BeanMonoBehaviour就激活一下，这样才会调用Awake方法
-            var hiddenBeans = Resources.FindObjectsOfTypeAll<BeanMonoBehaviour>().Where(bean => !bean.gameObject.activeSelf).ToList();
+            var hiddenBeans = Resources.FindObjectsOfTypeAll<BeanMonoBehaviour>()
+                .Where(bean => !bean.gameObject.activeSelf).ToList();
             foreach (var bean in hiddenBeans)
             {
                 bean.gameObject.SetActive(true);
                 bean.gameObject.SetActive(false);
             }
-            // 获取场景名称，计算出场景中需要注入的MonoBehaviour实例数
-            var sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            var behaviours = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .Where(t => t.GetCustomAttributes(typeof(DefaultInjectAttribute), true).Length > 0).ToList();
-            foreach (var dummy in behaviours
-                         .Select(behaviour => behaviour.GetCustomAttribute<DefaultInjectAttribute>())
-                         .Where(attribute => attribute.SceneNameList.Contains(sceneName)))
-            {
-                _instancesCount++;
-            }
-            
-            // 获得场景上所有挂载了BeanObject且isDefault为true的物体
-            var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>().Where(bean => bean.isDefault).ToList();
-            foreach (var beanObject in beanObjects)
-            {
-                AddBean(beanObject.name, beanObject, false);
-                _behaviours.Add(beanObject);
-                // 这里也需要把默认实例数加1
-                _instancesCount++;
-            }
+
             // 如果为0，把IsInjected设为true
             if (_instancesCount == 0)
             {
@@ -234,6 +258,13 @@ namespace EasyInject.Utils
             foreach (var type in _beans.Keys.ToList())
             {
                 var instance = _beans[type];
+
+                // 如果有PersistAcrossScenesAttribute特性，跳过，因为这个是持久化的游戏组件对象
+                if (instance.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() != null)
+                {
+                    continue;
+                }
+
                 var fields = instance.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
 
@@ -268,7 +299,7 @@ namespace EasyInject.Utils
             var type = instance.GetType();
             var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
                 .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0);
-            
+
             foreach (var field in fields)
             {
                 // 如果Autowired传了名字参数，名字和类型都要匹配
@@ -305,7 +336,7 @@ namespace EasyInject.Utils
         {
             var beanInfo = new BeanInfo(name, instance.GetType());
             _beans[beanInfo] = instance;
-            
+
             // 如果有实现接口，且接口不是Unity相关的接口，也要注册进IoC容器
             var interfaces = instance.GetType().GetInterfaces();
             foreach (var @interface in interfaces)
@@ -314,14 +345,14 @@ namespace EasyInject.Utils
                 beanInfo = new BeanInfo(name, @interface);
                 _beans[beanInfo] = instance;
             }
-            
+
 
             if (startInject)
             {
                 Inject(instance);
             }
         }
-        
+
         /// <summary>
         /// 检查_shelvedInstances中的实例是否可以注入
         /// </summary>

@@ -22,6 +22,7 @@
         * [Beans That Exist When the Scene Is Initialized](#33-beans-that-exist-when-the-scene-is-initialized)
         * [Register GameObjects Without Writing GameObject Component Classes](#34-register-gameobjects-without-writing-gameobject-component-classes)
         * [GameObject Component Class Bean Based on Liskov Substitution Principle](#35-gameobject-component-class-bean-based-on-liskov-substitution-principle)
+        * [GameObject Component Class Bean Across Scenes](#36-gameobject-component-class-bean-across-scenes)
 * [Future Plans](#future-plans)
 * [Contact Information](#contact-information)
 
@@ -93,6 +94,8 @@ public class TestComponent
 You can use the `[Autowired]` attribute to inject the Bean into the field.
 
 The injected class must also have the `[Component]` attribute, or inherit from `BeanMonoBehaviour` or `InjectableMonoBehaviour`.
+
+***Note:*** Non-GameObject component classes will be registered before GameObject component classes, so you can not inject GameObject component classes into non-GameObject component classes.
 
 ```csharp
 [Component]
@@ -371,6 +374,58 @@ public class TestMonoBehaviour8 : InjectableMonoBehaviour
     {
         testMonoBehaviour6.say();
         testMonoBehaviour7.say();
+    }
+}
+```
+
+#### 3.6 GameObject Component Class Bean Across Scenes
+
+If you need to register a Bean across scenes, you can use the `[PersistAcrossScenes]` attribute. Please ensure that the class calls `DontDestroyOnLoad()` during initialization.
+
+The Bean class which across scenes should be written like this:
+
+```csharp
+[PersistAcrossScenes]
+[DefaultInject("GameScene", "MenuScene")]
+public class TestAcrossScenes : BeanMonoBehaviour
+{
+    public string value = "Hello World!";
+    
+    protected override void OnAwake()
+    {
+        DontDestroyOnLoad(gameObject);
+    }
+}
+```
+
+At MenuScene, you can inject the Bean like this:
+
+```csharp
+[DefaultInject("MenuScene")]
+public class Test1 : InjectableMonoBehaviour
+{
+    [Autowired]
+    private TestAcrossScenes _testAcrossScenes;
+
+    protected override void OnAwake()
+    {
+        Debug.Log(_testAcrossScenes.value);
+    }
+}
+```
+
+At GameScene, you can inject the Bean like this:
+
+```csharp
+[DefaultInject("GameScene")]
+public class Test2 : InjectableMonoBehaviour
+{
+    [Autowired]
+    private TestAcrossScenes _testAcrossScenes;
+
+    protected override void OnAwake()
+    {
+        Debug.Log(_testAcrossScenes.value);
     }
 }
 ```
