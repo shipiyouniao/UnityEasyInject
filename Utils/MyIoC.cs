@@ -47,7 +47,7 @@ namespace EasyInject.Utils
             {
                 var type = instance.GetType();
                 var beanName = type.GetCustomAttribute<BeanNameAttribute>();
-                AddBean(beanName != null ? beanName.Name : string.Empty, instance, false);
+                AddBean(beanName?.Name ?? string.Empty, instance, false);
             }
 
             OnAwakeCalled += action;
@@ -126,7 +126,7 @@ namespace EasyInject.Utils
             {
                 // 如果在beans当中，就跳过（常常是因为包含PersistAcrossScenesAttribute特性）
                 var beanName = behaviour.GetCustomAttribute<BeanNameAttribute>();
-                var beanInfo = new BeanInfo(beanName != null ? beanName.Name : string.Empty, behaviour);
+                var beanInfo = new BeanInfo(beanName?.Name ?? string.Empty, behaviour);
                 if (_beans.ContainsKey(beanInfo))
                 {
                     continue;
@@ -141,11 +141,11 @@ namespace EasyInject.Utils
             {
                 // 这里也需要把默认实例数加1
                 _instancesCount++;
-                
+
                 AddBean(beanObject.name, beanObject, false);
                 _behaviours.Add(beanObject);
             }
-            
+
             // 获得场景上所有被隐藏的物体，如果是BeanMonoBehaviour就激活一下，这样才会调用Awake方法
             var hiddenBeans = Resources.FindObjectsOfTypeAll<BeanMonoBehaviour>()
                 .Where(bean => !bean.gameObject.activeSelf).ToList();
@@ -225,28 +225,8 @@ namespace EasyInject.Utils
                     }
 
                     if (instance == null) continue;
-                    // 注册进IoC容器
-                    beanInfo = new BeanInfo(type.GetCustomAttribute<ComponentAttribute>().Name, type);
-                    _beans[beanInfo] = instance;
-                    // 观察这个类是否实现了接口，如果有也要把接口作为key注册进IoC容器
-                    var interfaces = type.GetInterfaces();
-                    foreach (var @interface in interfaces)
-                    {
-                        beanInfo = @interface.GetCustomAttribute<ComponentAttribute>()?.Name == null
-                            ? new BeanInfo(type.GetCustomAttribute<ComponentAttribute>().Name, @interface)
-                            : new BeanInfo(@interface.GetCustomAttribute<ComponentAttribute>().Name, @interface);
-                        _beans[beanInfo] = instance;
-                    }
-
-                    // 观察这个类是否继承了父类，如果有也要把父类作为key注册进IoC容器（不能是Object）
-                    var baseType = type.BaseType;
-                    if (baseType != null && baseType != typeof(object))
-                    {
-                        beanInfo = baseType.GetCustomAttribute<ComponentAttribute>()?.Name == null
-                            ? new BeanInfo(type.GetCustomAttribute<ComponentAttribute>().Name, baseType)
-                            : new BeanInfo(baseType.GetCustomAttribute<ComponentAttribute>().Name, baseType);
-                        _beans[beanInfo] = instance;
-                    }
+                    RegisterTypeAndParentsAndInterfaces(
+                        type.GetCustomAttribute<ComponentAttribute>()?.Name ?? string.Empty, instance, type);
 
                     // 从待注册列表中移除
                     types.RemoveAt(i);
@@ -334,18 +314,7 @@ namespace EasyInject.Utils
         /// <param name="startInject">是否立即注入</param>
         public void AddBean(string name, object instance, bool startInject = true)
         {
-            var beanInfo = new BeanInfo(name, instance.GetType());
-            _beans[beanInfo] = instance;
-
-            // 如果有实现接口，且接口不是Unity相关的接口，也要注册进IoC容器
-            var interfaces = instance.GetType().GetInterfaces();
-            foreach (var @interface in interfaces)
-            {
-                if (@interface.Namespace == null || @interface.Namespace.Contains("UnityEngine")) continue;
-                beanInfo = new BeanInfo(name, @interface);
-                _beans[beanInfo] = instance;
-            }
-
+            RegisterTypeAndParentsAndInterfaces(name, instance, instance.GetType());
 
             if (startInject)
             {
@@ -385,6 +354,35 @@ namespace EasyInject.Utils
                 {
                     _shelvedInstances.Remove(ins);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 按照继承链注册自己、父类和接口（包括注册到Object）
+        /// </summary>
+        /// <param name="name">bean的名称</param>
+        /// <param name="instance">bean的实例</param>
+        /// <param name="type">bean的类型</param>
+        private void RegisterTypeAndParentsAndInterfaces(string name, object instance, Type type)
+        {
+            name ??= string.Empty;
+            // 注册自己
+            var beanInfo = new BeanInfo(name, type);
+            _beans[beanInfo] = instance;
+
+            // 注册父类
+            var baseType = type.BaseType;
+            if (baseType != null)
+            {
+                RegisterTypeAndParentsAndInterfaces(name, instance, baseType);
+            }
+
+            // 注册接口
+            var interfaces = type.GetInterfaces();
+            foreach (var @interface in interfaces)
+            {
+                if (@interface.Namespace == null || @interface.Namespace.Contains("UnityEngine")) continue;
+                RegisterTypeAndParentsAndInterfaces(name, instance, @interface);
             }
         }
     }

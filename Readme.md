@@ -184,13 +184,9 @@ public class TestComponent6
 
 #### 2.5 Non-GameObject Component Class Bean Based on Liskov Substitution Principle
 
-If a class inherits another class or implements an interface, the parent class or interface will also be registered as a Bean.
+If a class inherits another class or implements an interface, the parent class or interface and the parent class's parent class and interface (and so on) will also be registered as the corresponding information of the Bean instance.
 
-If there are multiple subclasses, please be sure to specify the name in the `[Component]` of the subclass.
-
-***However, the framework will not register according to the inheritance chain, only the parent class or interface of the implementation class will be registered. Therefore, when injecting, the type of the member variable is at most the type of the parent class. Also, please ensure that the parent class is not registered as a Bean using the `[Component]` attribute.***
-
-***In addition, if the parent class is `Object`, it will not be registered as a Bean. Therefore, do not use `Object` as the type of the member variable for dependency injection.***
+***If the parent class or interface has multiple subclasses or implementation classes, please make sure to use the `[Component]` attribute to specify a name to make it unique.***
 
 ```csharp
 public interface ITestService
@@ -330,13 +326,9 @@ public class TestMonoBehaviour5 : BeanMonoBehaviour
 
 #### 3.5 GameObject Component Class Bean Based on Liskov Substitution Principle
 
-GameObject component classes are also based on the Liskov Substitution Principle. If a class implements many interfaces, please make sure to specify the name in the `[BeanName]` of the subclass.
+GameObject component classes are also based on the Liskov Substitution Principle.
 
-There will be no parent class registered as a Bean because the class is always inherited from `BeanMonoBehaviour`.
-
-***However, the framework will not register according to the implementation chain, only the parent interface of the implementation class will be registered.***
-
-***But if the interface is a Unity-related interface (namespace contains `UnityEngine`), the interface will be skipped.***
+***If the parent class or interface has multiple subclasses or implementation classes, please make sure to use the `[BeanName]` attribute to specify a name to make it unique.***
 
 ```csharp
 public interface ISay
