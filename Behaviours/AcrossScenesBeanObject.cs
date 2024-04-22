@@ -9,5 +9,10 @@ namespace EasyInject.Behaviours
     [PersistAcrossScenes]
     public class AcrossScenesBeanObject : BeanObject
     {
+        private void Awake()
+        {
+            // 保证不被销毁
+            DontDestroyOnLoad(gameObject);
+        }
     }
 }

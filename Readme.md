@@ -60,6 +60,7 @@ public class TestInstaller : MonoInstaller
     {
         Container.Bind<TestComponent>().AsSingle();
     }
+}
 ```
 
 By using Unity Easy Inject, you just need to add a few attributes to the class, and the class will be registered as a Bean, which is much simpler and easier to use.
