@@ -13,7 +13,7 @@ namespace EasyInject.Utils
     /// author: spyn
     /// description: IoC容器
     /// </summary>
-    public class MyIoC
+    public class MyIoC : IIoC
     {
         // IoC容器
         private readonly Dictionary<BeanInfo, object> _beans = new();

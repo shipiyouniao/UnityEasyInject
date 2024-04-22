@@ -113,7 +113,7 @@ public class TestMonoBehaviour : MonoBehaviour
 public class GlobalInitializer : MonoBehaviour
 {
     // 实例化一个IoC容器，存入静态变量中，这样就可以导致整个游戏都只有一个IoC容器
-    public static readonly MyIoC Instance = new();
+    public static readonly IIoC Instance = new MyIoC();
 
     private void Awake()
     {
@@ -122,6 +122,12 @@ public class GlobalInitializer : MonoBehaviour
     }
 }
 ```
+
+IoC容器提供了三个方法：
+
+* `Init()`：在每个场景开始时初始化IoC容器，注册所有的Bean。
+* `GetBean<T>(string name = "")`：获取一个Bean，不填写名字则以空字符串作为名字。
+* `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`：创建一个物体作为Bean。
 
 ### 2. 非游戏物体组件类对象
 
@@ -144,9 +150,7 @@ public class TestComponent
 
 #### 2.2 字段注入获取Bean
 
-如果想使用字段注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`特性，或是继承了`BeanMonoBehaviour`或`InjectableMonoBehaviour`的游戏物体组件类。
-
-***由于普通对象是最开始被注册的，因此你不可以把游戏物体组件类的Bean注入到普通对象当中。***
+如果想使用字段注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`或`[GameObjectBean]`特性，或是在游戏过程中被作为Bean生成的游戏物体组件类。
 
 ```csharp
 [Component]
@@ -427,8 +431,6 @@ public class TestMonoBehaviour8 : MonoBehaviour
 如果您的游戏物体组件类是跨场景的，必须使用`[PersistAcrossScenes]`特性。同时请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
 
 如果您的游戏对象没有编写游戏组件类，可以为其挂载`AcrossScenesBeanObject`脚本。这个脚本是`BeanObject`的子类，会自动挂载`PersistAcrossScenes`特性。
-
-场景之间共享的Bean：
 
 ```csharp
 [PersistAcrossScenes]

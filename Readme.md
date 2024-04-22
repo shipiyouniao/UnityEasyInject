@@ -115,7 +115,7 @@ If the startup time of the startup controller is incorrect, causing the IoC cont
 [DefaultExecutionOrder(-1000000)] 
 public class GlobalInitializer : MonoBehaviour
 {
-    public static readonly MyIoC Instance = new();
+    public static readonly IIoC Instance = new MyIoC();
 
     private void Awake()
     {
@@ -123,6 +123,12 @@ public class GlobalInitializer : MonoBehaviour
     }
 }
 ```
+
+The IoC container provides three methods:
+
+* `Init()`: Initialize the IoC container.
+* `GetBean<T>(string name = "")`: Get a Bean by name, if the name is not specified, an empty string will be used.
+* `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`：Create a GameObject as a Bean.
 
 ### 2. Non-GameObject Component Class Object
 
@@ -147,9 +153,7 @@ public class TestComponent
 
 You can use the `[Autowired]` attribute to inject the Bean into the field.
 
-The injected class must also have the `[Component]` attribute, or inherit from `BeanMonoBehaviour` or `InjectableMonoBehaviour`.
-
-***Note:*** Non-GameObject component classes will be registered before GameObject component classes, so you can not inject GameObject component classes into non-GameObject component classes.
+The injected class must also have the `[Component]` or `[GameObjectBean]` attribute, or any GameObject component class that is generated as a Bean during the game.
 
 ```csharp
 [Component]
@@ -357,9 +361,7 @@ public class TestMonoBehaviour4 : MonoBehaviour
 
 If you want to add a GameObject as a Bean to the scene, which is not already in the scene, you can use the `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)` method provided by the container.
 
-The method is quite different from the `Instantiate(T original, Transform parent)` method, the first parameter is a `GameObject` prototype, not a generic class `T`.
-
-Otherwise, the name of bean is required as the third parameter.
+The method is quite different from the `Instantiate(T original, Transform parent)` method, the first parameter is a `GameObject` prototype, not a generic class `T`. The name of bean is required as the third parameter.
 
 Then you need to pass a type of the component class to the method, and the method will return the instance of the component class as the type of bean, which is different from the `Instantiate` method.
 
@@ -436,8 +438,6 @@ public class TestMonoBehaviour8 : MonoBehaviour
 If you need to register a Bean across scenes, you can use the `[PersistAcrossScenes]` attribute. Please ensure that the class calls `DontDestroyOnLoad()` during initialization.
 
 If it is no need to write any component class, you can attach the `EasyInject/Behaviours/AcrossScenesBeanObject` script to the GameObject. The script is a subclass of `BeanObject` and will automatically attach the `PersistAcrossScenes` attribute.
-
-The Bean class which across scenes should be written like this:
 
 ```csharp
 [PersistAcrossScenes]
