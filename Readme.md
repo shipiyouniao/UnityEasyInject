@@ -88,7 +88,17 @@ Can not wait to try it? Let's get started!
 
 ## Installation
 
-Currently, only decompression installation is supported. Please download the project and unzip it to the Assets directory of the Unity project.
+### 1. Download the Project
+
+You can download the project from the [GitHub repository](https://github.com/shipiyouniao/UnityEasyInject/tree/main) by clicking the green Code button on the GitHub repository page and selecting Download ZIP.
+
+Just unzip the downloaded file at `Assets` directory of your Unity project, and you are ready to go.
+
+### 2. Import the Project
+
+You can download the latest Unity Package file (*.unitypackage) from the Releases page on the repository page.
+
+Then in Unity, select `Assets` -> `Import Package` -> `Custom Package...`, and select the downloaded Unity Package file.
 
 ---
 

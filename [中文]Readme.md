@@ -87,7 +87,15 @@ public class TestMonoBehaviour : MonoBehaviour
 
 ## 安装
 
-目前只支持解压安装。请将项目下载后解压到Unity项目的Assets目录下。
+### 1. 下载源码安装
+
+在[GitHub仓库界面](https://github.com/shipiyouniao/UnityEasyInject/tree/main)点击绿色的Code按钮，选择Download ZIP，下载源码。
+
+解压后将`EasyInject`文件夹拷贝到你的Unity项目中的`Assets`文件夹下即可。
+
+### 2. 使用Unity Package Manager安装
+
+在仓库界面点击Releases，下载最新的Unity Package文件（*.unitypackage），然后在Unity中选择`Assets（资源）` -> `Import Package（导入包）` -> `Custom Package（自定义包...）`，选择下载的Unity Package文件即可。
 
 ---
 
