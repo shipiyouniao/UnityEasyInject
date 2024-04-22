@@ -1,12 +1,9 @@
 # Unity Easy Inject
 
-## 作者
-
-石皮幼鸟（SPYN）
-
 ## 目录
 
 * [介绍](#介绍)
+* [为什么选择Unity Easy Inject?](#为什么选择unity-easy-inject)
 * [安装](#安装)
 * [使用方法](#使用方法)
     * [启动IoC容器](#1-启动ioc容器)
@@ -17,10 +14,10 @@
         * [Bean的名字](#24-Bean的名字)
         * [基于里氏替换原则的非游戏物体组件类Bean](#25-基于里氏替换原则的非游戏物体组件类bean)
     * [游戏物体对象](#3-游戏物体对象)
-        * [注册或仅注入游戏物体组件类](#31-注册或仅注入游戏物体组件类)
+        * [注册场景上已存在的游戏物体组件类](#31-注册场景上已存在的游戏物体组件类)
         * [Bean的名字](#32-Bean的名字)
-        * [场景初始化时存在的Bean](#33-场景初始化时存在的bean)
-        * [注册没有编写游戏物体组件类的游戏对象](#34-注册没有编写游戏物体组件类的游戏对象)
+        * [注册没有编写游戏物体组件类的游戏对象](#33-注册没有编写游戏物体组件类的游戏对象)
+        * [为场景添加一个作为Bean的物体](#34-为场景添加一个作为bean的物体)
         * [基于里氏替换原则的游戏物体组件类Bean](#35-基于里氏替换原则的游戏物体组件类bean)
         * [跨场景的Bean](#36-跨场景的bean)
 * [未来计划](#未来计划)
@@ -32,13 +29,59 @@
 
 Unity Easy Inject是一个Unity依赖注入（DI）框架，它可以帮助你更好的管理Unity项目中的依赖关系，使得项目更加易于维护和扩展。
 
-使用本框架，可以代替用户手动添加public字段，然后在Inspector中拖拽注入进行引用的方式，或者替代声明接口类然后实例化实现类的方式，降低模块耦合度，使得项目更加易于维护和扩展。
-
 本框架的使用方法受SpringBoot的启发，故使用方法与其十分相似。
 
 但由于项目目前仍在早期阶段，故只支持将类对象作为Bean进行注册。
 
 项目由一位从WEB全栈转向Unity的大三初学者开发，故难免会有一些不足之处，欢迎大家提出宝贵意见。
+
+---
+
+## 为什么选择Unity Easy Inject?
+
+* **简单易用**：只需要简单的几行代码，就可以实现依赖注入，简化开发流程。
+* **基于特性**：使用特性进行Bean的注册，不需要额外的配置文件。
+* **耦合度低**：使用依赖注入，可以降低组件之间的耦合度，使得项目更加易于维护和扩展。
+
+平时使用Unity开发项目时，我们经常会遇到这样的问题：当一个游戏组件需要使用另一个游戏组件时，我们需要为组件添加一个`public`修饰的字段，然后在Unity编辑器中手动拖拽另一个组件到这个字段上。
+
+这样的做法虽然简单，但是当项目变得越来越大时，这样的做法就会变得越来越麻烦，并且耦合度也会变得越来越高。
+
+这个时候我们就会去寻找一种更好的解决方案，控制反转（IoC）就是其中之一。
+
+如果你使用过Zenject等依赖注入框架，你会发现，我们需要手动将类对象作为Bean注册到容器中，这样的做法会使得项目变得更加复杂，比如这样：
+
+```csharp
+public class TestInstaller : MonoInstaller
+{
+    public override void InstallBindings()
+    {
+        Container.Bind<TestComponent>().AsSingle();
+    }
+}
+```
+
+使用Unity Easy Inject，你只需要在类对象上添加一个特性，就可以实现Bean的注册。
+
+字段注入也十分简单，在`private`修饰的字段上添加一个特性就可以代替上面拖拽组件到`public`修饰的字段的做法。
+
+不需要额外的配置文件，就像这样：
+
+```csharp
+[GameObjectBean]
+public class TestMonoBehaviour : MonoBehaviour
+{
+    [Autowired]
+    private TestComponent testComponent;
+
+    private void Awake()
+    {
+        testComponent.SetActive(true);
+    }
+}
+```
+
+是否已经等不及想要尝试了呢？现在就开始吧！
 
 ---
 
@@ -220,21 +263,20 @@ public class TestController
 
 ### 3. 游戏物体对象
 
-#### 3.1 注册或仅注入游戏物体组件类
+#### 3.1 注册场景上已存在的游戏物体组件类
 
-游戏物体组件类使用控制反转的方式是继承`BeanMonoBehaviour`或`InjectableMonoBehaviour`。
+游戏物体组件类使用控制反转的方式是在类前使用`[GameObjectBean]`特性进行注册。
 
-`InjectableMonoBehaviour`并不是Bean，但是可以使用字段注入。而`BeanMonoBehaviour`是Bean，请合理按照业务需求选择。
-
-继承二者后，`Awake`生命周期钩子会被用于依赖注入，因此提供了一个`OnAwake`方法，在依赖注入完成后会被调用。因此如果需要进行初始化，请不要编写`Awake`方法，而是覆写`OnAwake`方法，并且尽可能避免使用`Start`方法。
+字段的注入时机在`Awake()`生命周期钩子之前，注入方式与普通对象一样，但是不支持构造函数注入方式。
 
 ```csharp
-public class TestMonoBehaviour : BeanMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour : MonoBehaviour
 {
     [Autowired]
     private TestComponent testComponent;
 
-    protected override void OnAwake()
+    private void Awake()
     {
         testComponent.Test();
     }
@@ -242,12 +284,13 @@ public class TestMonoBehaviour : BeanMonoBehaviour
 ```
 
 ```csharp
-public class TestMonoBehaviour2 : InjectableMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour2 : MonoBehaviour
 {
     [Autowired]
     private TestMonoBehaviour testMonoBehaviour;
     
-    protected override void OnAwake()
+    private void Awake()
     {
         testMonoBehaviour.gameObject.SetActive(true);
     }
@@ -256,47 +299,23 @@ public class TestMonoBehaviour2 : InjectableMonoBehaviour
 
 #### 3.2 Bean的名字
 
-如果您需要给游戏物体组件类设置名称，请使用`[BeanName]`特性。
+如果您需要给游戏物体组件类设置名称，请在`[GameObjectBean]`特性中传入名字。
 
 ```csharp
-[BeanName("TestMonoBehaviour3")]
-public class TestMonoBehaviour3 : BeanMonoBehaviour
+[GameObjectBean("TestMonoBehaviour3")]
+public class TestMonoBehaviour3 : MonoBehaviour
 {
     [Autowired]
     private TestComponent testComponent;
 
-    protected override void OnAwake()
+    private void Awake()
     {
         testComponent.Test();
     }
 }
 ```
 
-#### 3.3 场景初始化时存在的Bean
-
-考虑到生命周期的问题，在场景初始化时便存在的游戏物体组件单例（包括场景加载时默认隐藏的物体），可以使用`[DefaultInject]`特性，这样可以在IoC容器初始化时就注入。
-
-***但如果这样做的话，必须确保这个类是单例，并且需要被注入的字段也是标记了该特性的单例，否则会导致不可预知的错误。***
-
-请在参数中传入场景名称（不要带场景名之前的路径），场景之间用逗号隔开。
-
-使用了该特性的类如果在场景加载一开始没有被完成全部字段的注入，则会产生错误抛出异常。没有使用该特性的类，由于会在之后的过程中被注册为Bean，因此不会抛出异常。请针对游戏物体生成顺序进行合理的设计。
-
-```csharp
-[DefaultInject("SampleScene", "SampleScene2")]
-public class TestMonoBehaviour4 : BeanMonoBehaviour
-{
-    [Autowired]
-    private TestComponent testComponent;
-
-    protected override void OnAwake()
-    {
-        testComponent.Test();
-    }
-}
-```
-
-#### 3.4 注册没有编写游戏物体组件类的游戏对象
+#### 3.3 注册没有编写游戏物体组件类的游戏对象
 
 如果您想要把没有编写游戏物体组件类的游戏对象注册为Bean，可以在物体上挂载`EasyInject/Behaviours/BeanObject`脚本。
 
@@ -304,18 +323,46 @@ public class TestMonoBehaviour4 : BeanMonoBehaviour
 
 ***请保证物体名称不会重复，否则会导致不可预知的错误。***
 
-如果物体是一个初始就会被加载的物体（包括场景加载时默认隐藏的物体），请在Unity当中把脚本的`Is Default`属性勾选上。
-
 ```csharp
-public class TestMonoBehaviour5 : BeanMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour4 : MonoBehaviour
 {
     // 这里的名字是物体的名字
     [Autowired("TestObject")]
     private BeanObject testObject;
 
-    protected override void OnAwake()
+    private void Awake()
     {
         testObject.SetActive(true);
+    }
+}
+```
+
+#### 3.4 为场景添加一个作为Bean的物体
+
+如果您想要把一个物体作为Bean，但是这个物体不是初始就会被加载的物体，容器提供了一个名为`CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`的方法。
+
+与Unity提供的`Instantiate(T original, Transform parent)`方法不同，这个方法需要传入一个`GameObject`作为原型，而非泛型类`T`。
+
+此外，你还需要传入一个字符串作为Bean的名字，然后在方法泛型参数中传入你挂载在物体上的脚本，也就是Bean的类型。
+
+方法也将返回一个被字段注入完成的`T`类型的对象，这与Unity的`Instantiate(T original, Transform parent)`方法返回original的实例不同。
+
+如果您为物体编写了游戏物体组件类，组件的上方不需要标注`[GameObjectBean]`特性。
+
+***请确保这个物体上也挂载了与您传入的泛型参数相同的脚本，除非您传入的泛型参数是`BeanObject`或`AcrossScenesBeanObject`，容器会自动帮您挂载，否则会导致不可预知的错误。`AcrossScenesBeanObject`相关的内容请参考[跨场景的Bean](#36-跨场景的bean)。***
+
+```csharp
+[GameObjectBean]
+public class TestMonoBehaviour5 : MonoBehaviour
+{
+    public GameObject prefab;
+    
+    private void Start()
+    {
+        // 创建一个物体作为Bean
+        var go = GlobalInitializer.Instance.CreateGameObjectAsBean<BeanObject>(prefab, transform, "testObj");
+        go.SetActive(true);
     }
 }
 ```
@@ -324,7 +371,7 @@ public class TestMonoBehaviour5 : BeanMonoBehaviour
 
 游戏物体组件类也可以基于里氏替换原则进行注册。
 
-***如果有多个子类或实现类，那么请务必在子类或实现类当中使用`[BeanName]`当中指定名字使其唯一化。***
+***如果有多个子类或实现类，那么请务必在子类或实现类当中指定名字使其唯一化。***
 
 ```csharp
 public interface ISay
@@ -332,8 +379,8 @@ public interface ISay
     void say();
 }
 
-[BeanName("TestMonoBehaviour6")]
-public class TestMonoBehaviour6 : BeanMonoBehaviour, ISay
+[GameObjectBean("TestMonoBehaviour6")]
+public class TestMonoBehaviour6 : MonoBehaviour, ISay
 {
     public void say()
     {
@@ -341,8 +388,8 @@ public class TestMonoBehaviour6 : BeanMonoBehaviour, ISay
     }
 }
 
-[BeanName("TestMonoBehaviour7")]
-public class TestMonoBehaviour7 : BeanMonoBehaviour, ISay
+[GameObjectBean("TestMonoBehaviour7")]
+public class TestMonoBehaviour7 : MonoBehaviour, ISay
 {
     public void say()
     {
@@ -350,7 +397,8 @@ public class TestMonoBehaviour7 : BeanMonoBehaviour, ISay
     }
 }
 
-public class TestMonoBehaviour8 : InjectableMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour8 : MonoBehaviour
 {
     [Autowired("TestMonoBehaviour6")]
     private ISay testMonoBehaviour6;
@@ -358,7 +406,7 @@ public class TestMonoBehaviour8 : InjectableMonoBehaviour
     [Autowired("TestMonoBehaviour7")]
     private ISay testMonoBehaviour7;
     
-    protected override void OnAwake()
+    private void Awake()
     {
         testMonoBehaviour6.say();
         testMonoBehaviour7.say();
@@ -368,52 +416,20 @@ public class TestMonoBehaviour8 : InjectableMonoBehaviour
 
 #### 3.6 跨场景的Bean
 
-如果您的游戏物体组件类是跨场景的，可以使用`[PersistAcrossScenes]`特性。请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
+如果您的游戏物体组件类是跨场景的，必须使用`[PersistAcrossScenes]`特性。同时请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
+
+如果您的游戏对象没有编写游戏组件类，可以为其挂载`AcrossScenesBeanObject`脚本。这个脚本是`BeanObject`的子类，会自动挂载`PersistAcrossScenes`特性。
 
 场景之间共享的Bean：
 
 ```csharp
 [PersistAcrossScenes]
-[DefaultInject("GameScene", "MenuScene")]
-public class TestAcrossScenes : BeanMonoBehaviour
+[GameObjectBean]
+public class TestAcrossScenes : MonoBehaviour
 {
-    public string value = "Hello World!";
-    
-    protected override void OnAwake()
+    private void Awake()
     {
         DontDestroyOnLoad(gameObject);
-    }
-}
-```
-
-在MenuScene场景中使用：
-
-```csharp
-[DefaultInject("MenuScene")]
-public class Test1 : InjectableMonoBehaviour
-{
-    [Autowired]
-    private TestAcrossScenes _testAcrossScenes;
-
-    protected override void OnAwake()
-    {
-        Debug.Log(_testAcrossScenes.value);
-    }
-}
-```
-
-在GameScene场景中使用：
-
-```csharp
-[DefaultInject("GameScene")]
-public class Test2 : InjectableMonoBehaviour
-{
-    [Autowired]
-    private TestAcrossScenes _testAcrossScenes;
-
-    protected override void OnAwake()
-    {
-        Debug.Log(_testAcrossScenes.value);
     }
 }
 ```
@@ -425,7 +441,6 @@ public class Test2 : InjectableMonoBehaviour
 * 支持更多的特性，让框架在符合Unity的同时更加逼近SpringBoot
 * 支持更多的依赖注入方式，如属性注入
 * 适应非Unity项目的普通C#项目
-* 仅使用特性进行对游戏物体组件类的注册，不需要继承其他类
 
 ---
 

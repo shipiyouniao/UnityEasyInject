@@ -4,19 +4,19 @@ namespace EasyInject.Attributes
 {
     /// <summary>
     /// author: spyn
-    /// description: 打在BeanMonoBehaviour上的特性，传入Bean的名字
+    /// description: 打在MonoBehaviour上的特性，标明是一个Bean
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
-    public class BeanNameAttribute : Attribute
+    public class GameObjectBeanAttribute : Attribute
     {
         public string Name { get; }
 
-        public BeanNameAttribute(string name)
+        public GameObjectBeanAttribute(string name)
         {
             Name = name;
         }
         
-        public BeanNameAttribute()
+        public GameObjectBeanAttribute()
         {
             Name = string.Empty;
         }

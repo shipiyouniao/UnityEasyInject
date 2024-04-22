@@ -18,67 +18,66 @@ namespace EasyInject.Utils
         // IoC容器
         private readonly Dictionary<BeanInfo, object> _beans = new();
 
-        // 默认需要注入的MonoBehaviour实例
-        private readonly List<object> _behaviours = new();
-
         // 尚未注入字段的实例
-        private readonly Dictionary<object, HashSet<string>> _shelvedInstances = new();
-
-        // 某场景下需要一开始就注入的MonoBehaviour实例数
-        private int _instancesCount;
-
-        // 用于全部注入完成后的回调
-        private event Action OnAwakeCalled;
-
-        // 默认需要注入的MonoBehavior是否已经全部注入
-        public bool IsInjected { get; private set; }
+        private readonly Dictionary<ShelvedInstance, HashSet<string>> _shelvedInstances = new();
 
         /// <summary>
-        /// 增加一个待注入的实例和完成后的回调
+        /// 创建一个GameObject作为Bean
         /// </summary>
-        /// <param name="instance">待注入的实例</param>
-        /// <param name="action">完成后的回调</param>
-        /// <param name="isBean">是否是Bean</param>
-        public void AddDefaultInstance(object instance, Action action, bool isBean)
+        /// <param name="original">原型</param>
+        /// <param name="parent">父物体</param>
+        /// <param name="beanName">名字</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>Bean实例</returns>
+        public T CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)
+            where T : MonoBehaviour
         {
-            _behaviours.Add(instance);
-            // 如果是Bean，就放入IoC容器
-            if (isBean)
+            var go = UnityEngine.Object.Instantiate(original, parent);
+
+            // 如果T是BeanObject或AcrossScenesBeanObject且没有挂载，就挂载BeanObject或AcrossScenesBeanObject，否则报错
+            var behaviour = go.GetComponent<T>();
+            if (behaviour == null)
             {
-                var type = instance.GetType();
-                var beanName = type.GetCustomAttribute<BeanNameAttribute>();
-                AddBean(beanName?.Name ?? string.Empty, instance, false);
+                if (typeof(T) == typeof(AcrossScenesBeanObject))
+                {
+                    behaviour = go.AddComponent<AcrossScenesBeanObject>() as T;
+                }
+                else if (typeof(T) == typeof(BeanObject))
+                {
+                    behaviour = go.AddComponent<BeanObject>() as T;
+                }
+                else
+                {
+                    throw new Exception($"Did not find the corresponding component as {typeof(T)}");
+                }
             }
 
-            OnAwakeCalled += action;
-
-            if (_behaviours.Count == _instancesCount)
+            // 如果在IoC容器中已经有这个Bean，就拋出异常
+            if (_beans.ContainsKey(new BeanInfo(beanName, typeof(T))))
             {
-                InjectDefaultInstances();
+                throw new Exception($"Bean {beanName} already exists");
             }
+
+            AddBean(beanName, behaviour);
+
+            return behaviour;
         }
 
         /// <summary>
-        /// 注入默认的MonoBehaviour实例
+        /// 获取一个Bean
         /// </summary>
-        private void InjectDefaultInstances()
+        /// <param name="name">Bean的名字</param>
+        /// <typeparam name="T">Bean的类型</typeparam>
+        /// <returns>Bean实例</returns>
+        public T GetBean<T>(string name = "") where T : class
         {
-            for (var i = 0; i < _behaviours.Count; i++)
+            var beanInfo = new BeanInfo(name, typeof(T));
+            if (_beans.TryGetValue(beanInfo, out var value))
             {
-                var instance = _behaviours[i];
-                Inject(instance);
+                return (T) value;
             }
 
-            // 检查实例是否注入完成，如果没有，证明默认的不满足，抛出异常
-            if (_shelvedInstances.Count > 0)
-            {
-                // 异常说明显示的是第一个没有注入完成的实例
-                var ins = _shelvedInstances.First();
-                throw new Exception($"No service of type {ins.Key.GetType()} found for autowiring");
-            }
-
-            IsInjected = true;
-            OnAwakeCalled?.Invoke();
+            return null;
         }
 
         /// <summary>
@@ -99,10 +98,6 @@ namespace EasyInject.Utils
             }
 
             _shelvedInstances.Clear();
-            _behaviours.Clear();
-            IsInjected = false;
-            _instancesCount = 0;
-            OnAwakeCalled = null;
 
             InitNormalBean();
             GetDefaultMonoBehaviourInfo();
@@ -113,52 +108,24 @@ namespace EasyInject.Utils
         /// </summary>
         private void GetDefaultMonoBehaviourInfo()
         {
-            // 获取场景名称，计算出场景中需要注入的MonoBehaviour实例数
-            var sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            var behaviours = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .Where(t => t.GetCustomAttributes(typeof(DefaultInjectAttribute), true).Length > 0)
-                .ToList();
-            foreach (var behaviour in from behaviour in behaviours
-                     let sceneNames = behaviour.GetCustomAttribute<DefaultInjectAttribute>().SceneNameList
-                     where sceneNames.Contains(sceneName)
-                     select behaviour)
+            // 获得场景上所有挂载了BeanObject的物体
+            var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>().ToList();
+            foreach (var beanObject in beanObjects.Where(beanObject =>
+                         !_beans.ContainsKey(new BeanInfo(beanObject.name, typeof(BeanObject)))))
             {
-                // 如果在beans当中，就跳过（常常是因为包含PersistAcrossScenesAttribute特性）
-                var beanName = behaviour.GetCustomAttribute<BeanNameAttribute>();
-                var beanInfo = new BeanInfo(beanName?.Name ?? string.Empty, behaviour);
-                if (_beans.ContainsKey(beanInfo))
-                {
-                    continue;
-                }
-
-                _instancesCount++;
-            }
-
-            // 获得场景上所有挂载了BeanObject且isDefault为true的物体
-            var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>().Where(bean => bean.isDefault).ToList();
-            foreach (var beanObject in beanObjects)
-            {
-                // 这里也需要把默认实例数加1
-                _instancesCount++;
-
+                // 不需要进行字段依赖注入，因为BeanObject本来就是空的
                 AddBean(beanObject.name, beanObject, false);
-                _behaviours.Add(beanObject);
             }
 
-            // 获得场景上所有被隐藏的物体，如果是BeanMonoBehaviour就激活一下，这样才会调用Awake方法
-            var hiddenBeans = Resources.FindObjectsOfTypeAll<BeanMonoBehaviour>()
-                .Where(bean => !bean.gameObject.activeSelf).ToList();
-            foreach (var bean in hiddenBeans)
+            // 获得场景上所有挂载了GameObjectBeanAttribute的物体
+            var gameObjectBeans = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(monoBehaviour =>
+                monoBehaviour.GetType().GetCustomAttribute<GameObjectBeanAttribute>() != null).ToList();
+            foreach (var gameObjectBean in gameObjectBeans)
             {
-                bean.gameObject.SetActive(true);
-                bean.gameObject.SetActive(false);
-            }
-
-            // 如果为0，把IsInjected设为true
-            if (_instancesCount == 0)
-            {
-                IsInjected = true;
+                var name = gameObjectBean.GetType().GetCustomAttribute<GameObjectBeanAttribute>().Name;
+                // 如果已经存在，就不再添加（一般是因为这是持久化的对象）
+                if (_beans.ContainsKey(new BeanInfo(name, gameObjectBean.GetType()))) continue;
+                AddBean(name, gameObjectBean);
             }
         }
 
@@ -185,7 +152,6 @@ namespace EasyInject.Utils
                     object instance = null;
 
                     // 遍历构造函数，找到可以实例化的构造函数
-                    BeanInfo beanInfo;
                     foreach (var constructor in constructors)
                     {
                         // 获取构造函数的参数
@@ -199,7 +165,7 @@ namespace EasyInject.Utils
                             var parameterType = parameters[j].ParameterType;
                             // 获取参数上Autowired特性，也可以不打，视为Name为Empty
                             var name = parameters[j].GetCustomAttribute<AutowiredAttribute>()?.Name;
-                            beanInfo = new BeanInfo(name, parameterType);
+                            var beanInfo = new BeanInfo(name, parameterType);
 
                             // 如果IoC容器中有这个参数的实例，就注入
                             if (_beans.TryGetValue(beanInfo, out var parameterInstance))
@@ -272,9 +238,9 @@ namespace EasyInject.Utils
         /// <remarks>
         /// 要注意如果暂时无法完成注入，会被搁置，如果一直被搁置证明没有生成对应的Bean，在外部调用时肯定会报错
         /// </remarks>
+        /// <param name="beanName">Bean的名字</param>
         /// <param name="instance">MonoBehaviour实例</param>
-        /// <exception cref="Exception">没有找到对应的实例</exception>
-        public void Inject(object instance)
+        private void Inject(string beanName, object instance)
         {
             var type = instance.GetType();
             var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
@@ -294,8 +260,9 @@ namespace EasyInject.Utils
                 }
                 else
                 {
+                    var insKey = new ShelvedInstance(beanName, instance);
                     // 暂时放入_shelvedInstances中，等到有实例的时候再注入
-                    _shelvedInstances.Add(instance, injectedFields);
+                    _shelvedInstances.Add(insKey, injectedFields);
                     break;
                 }
             }
@@ -304,7 +271,7 @@ namespace EasyInject.Utils
         }
 
         /// <summary>
-        /// 新增一个Bean（一般是BeanMonoBehaviour）
+        /// 新增一个Bean（一般是MonoBehaviour）
         /// </summary>
         /// <remarks>
         /// 要注意如果暂时无法完成注入，会被搁置，如果一直被搁置证明没有生成对应的Bean，在外部调用时肯定会报错
@@ -312,13 +279,14 @@ namespace EasyInject.Utils
         /// <param name="name">Bean的名字</param>
         /// <param name="instance">Bean的实例</param>
         /// <param name="startInject">是否立即注入</param>
-        public void AddBean(string name, object instance, bool startInject = true)
+        private void AddBean<T>(string name, T instance, bool startInject = true)
+            where T : MonoBehaviour
         {
             RegisterTypeAndParentsAndInterfaces(name, instance, instance.GetType());
 
             if (startInject)
             {
-                Inject(instance);
+                Inject(name, instance);
             }
         }
 
@@ -327,17 +295,23 @@ namespace EasyInject.Utils
         /// </summary>
         private void CheckShelvedInstances()
         {
-            foreach (var ins in _shelvedInstances.ToList())
+            foreach (var (key, injectedFields) in _shelvedInstances.ToList())
             {
-                var insFields = ins.Key.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                var insFields = key.Instance.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
-                var injectedFields = ins.Value;
                 var count = insFields.Count;
 
                 foreach (var field in insFields)
                 {
+                    // 如果已经注入过了，就跳过
+                    if (injectedFields.Contains(field.Name))
+                    {
+                        count--;
+                        continue;
+                    }
+
                     // 如果Autowired传了名字参数，名字和类型都要匹配
-                    var name = field.GetCustomAttribute<AutowiredAttribute>()?.Name;
+                    var name = field.GetCustomAttribute<AutowiredAttribute>().Name;
                     var beanInfo = new BeanInfo(name, field.FieldType);
                     // 如果IoC容器中有这个类型的实例，就注入
                     if (!_beans.TryGetValue(beanInfo, out var value))
@@ -345,14 +319,14 @@ namespace EasyInject.Utils
                         continue;
                     }
 
-                    field.SetValue(ins.Key, value);
+                    field.SetValue(key.Instance, value);
                     injectedFields.Add(field.Name);
                     count--;
                 }
 
                 if (count == 0)
                 {
-                    _shelvedInstances.Remove(ins);
+                    _shelvedInstances.Remove(key);
                 }
             }
         }

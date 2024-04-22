@@ -1,4 +1,3 @@
-using EasyInject.Controllers;
 using UnityEngine;
 
 namespace EasyInject.Behaviours
@@ -9,15 +8,5 @@ namespace EasyInject.Behaviours
     /// </summary>
     public class BeanObject : MonoBehaviour
     {
-        public bool isDefault;
-        
-        private void Awake()
-        {
-            // 这里只给isDefault为false的Bean实现依赖注入
-            if (!isDefault)
-            {
-                GlobalInitializer.Instance.AddBean(name, this);
-            }
-        }
     }
 }

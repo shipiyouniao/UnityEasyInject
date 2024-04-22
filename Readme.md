@@ -1,12 +1,9 @@
 # Unity Easy Inject
 
-## Author
-
-石皮幼鸟（SPYN）
-
 ## Table of Contents
 
 * [Introduction](#introduction)
+* [Why Choose Unity Easy Inject?](#why-choose-unity-easy-inject)
 * [Installation](#installation)
 * [Usage](#usage)
     * [Start the IoC Container](#1-start-the-ioc-container)
@@ -17,10 +14,10 @@
         * [Bean Name](#24-bean-name)
         * [Non-GameObject Component Class Bean Based on Liskov Substitution Principle](#25-non-gameobject-component-class-bean-based-on-liskov-substitution-principle)
     * [GameObject Object](#3-gameobject-object)
-        * [Register or Only Inject GameObject Component Class](#31-register-or-only-inject-gameobject-component-class)
+        * [Register GameObject Component Class Which Already Exists in the Scene](#31-register-gameobject-component-class-which-already-exists-in-the-scene)
         * [Bean Name](#32-bean-name)
-        * [Beans That Exist When the Scene Is Initialized](#33-beans-that-exist-when-the-scene-is-initialized)
-        * [Register GameObjects Without Writing GameObject Component Classes](#34-register-gameobjects-without-writing-gameobject-component-classes)
+        * [Register GameObjects Without Writing GameObject Component Classes](#33-register-gameobjects-without-writing-gameobject-component-classes)
+        * [Add a New GameObject as a Bean to the Scene](#34-add-a-new-gameobject-as-a-bean-to-the-scene)
         * [GameObject Component Class Bean Based on Liskov Substitution Principle](#35-gameobject-component-class-bean-based-on-liskov-substitution-principle)
         * [GameObject Component Class Bean Across Scenes](#36-gameobject-component-class-bean-across-scenes)
 * [Future Plans](#future-plans)
@@ -39,6 +36,53 @@ The usage of this framework is inspired by Spring Boot, so the usage is very sim
 However, since the project is still in its early stages, only class objects can be registered as Beans.
 
 The project is developed by a junior of a college who has shifted from WEB to Unity as a newcomer, so there may be some shortcomings. Suggestions are welcome.
+
+---
+
+## Why Choose Unity Easy Inject?
+
+* **Simple and Easy to Use**: With just a few lines of code, you can achieve dependency injection, simplifying the development process.
+* **Based on Attributes**: Use attributes to register Beans, no need for additional configuration files.
+* **Low Coupling**: Using dependency injection can reduce the coupling between components, making the project easier to maintain and expand.
+
+When developing projects with Unity, we often encounter the following problem: when a game component needs to use another game component, we need to add a field with the `public` modifier, and then manually drag and drop the other component to this field in the Unity editor.
+
+Although this approach is simple, as the project grows larger, this approach becomes more and more cumbersome, and the coupling also becomes higher and higher.
+
+At this point, we will look for a better solution, Inversion of Control (IoC) is one of them.
+
+If you have used dependency injection frameworks such as Zenject, you will find that we need to manually register class objects as Beans in the container, which makes the project more complex, such as this:
+
+```csharp
+public class TestInstaller : MonoInstaller
+{
+    public override void InstallBindings()
+    {
+        Container.Bind<TestComponent>().AsSingle();
+    }
+```
+
+By using Unity Easy Inject, you just need to add a few attributes to the class, and the class will be registered as a Bean, which is much simpler and easier to use.
+
+It is easy to inject dependencies into the class. Just add an attribute to the field with the `private` modifier, and the dependency will be injected automatically.
+
+You do not need to write any configuration files, and you do not need to manually register the class as a Bean in the container, such as this:
+
+```csharp
+[GameObjectBean]
+public class TestMonoBehaviour : MonoBehaviour
+{
+    [Autowired]
+    private TestComponent testComponent;
+
+    private void Awake()
+    {
+        testComponent.SetActive(true);
+    }
+}
+```
+
+Can not wait to try it? Let's get started!
 
 ---
 
@@ -222,23 +266,22 @@ public class TestController
 
 ### 3. GameObject Object
 
-#### 3.1 Register or Only Inject GameObject Component Class
+#### 3.1 Register GameObject Component Class Which Already Exists in the Scene
 
-GameObject component classes will be registered after non-GameObject component classes, which means you need to use `new` to create an instance of the object.
+You can use the `[GameObjectBean]` attribute to register GameObject component classes that already exist in the scene.
 
-Please inherit from `BeanMonoBehaviour` or `InjectableMonoBehaviour` to inject the Bean.
+The time of registration is before the `Awake` method is called, so you can use the injected fields in the `Awake` method.
 
-`InjectableMonoBehaviour` means that the class will not be registered as a Bean, but can still be injected. But `BeanMonoBehaviour` will be registered as a Bean. Please choose according to your needs.
-
-When the class is inherited from the two classes, the `Awake` method will be used for dependency injection, so a `OnAwake` method is provided, which will be called after the dependency injection is completed. Therefore, if you need to initialize, do not write the `Awake` method, but override the `OnAwake` method, and try to avoid using the `Start` method.
+You cannot use the constructor injection method to inject GameObject component classes, as the Unity engine will not be able to instantiate the class.
 
 ```csharp
-public class TestMonoBehaviour : BeanMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour : MonoBehaviour
 {
     [Autowired]
     private TestComponent testComponent;
 
-    protected override void OnAwake()
+    private void Awake()
     {
         testComponent.Test();
     }
@@ -246,12 +289,13 @@ public class TestMonoBehaviour : BeanMonoBehaviour
 ```
 
 ```csharp
-public class TestMonoBehaviour2 : InjectableMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour2 : MonoBehaviour
 {
     [Autowired]
     private TestMonoBehaviour testMonoBehaviour;
     
-    protected override void OnAwake()
+    private void Awake()
     {
         testMonoBehaviour.gameObject.SetActive(true);
     }
@@ -260,47 +304,23 @@ public class TestMonoBehaviour2 : InjectableMonoBehaviour
 
 #### 3.2 Bean Name
 
-If you need to set a name for the GameObject component class, please use the `[BeanName]` attribute.
+If you need to set a name for the GameObject component class, please pass in the name in the `[GameObjectBean]` attribute.
 
 ```csharp
-[BeanName("TestMonoBehaviour3")]
-public class TestMonoBehaviour3 : BeanMonoBehaviour
+[GameObjectBean("TestMonoBehaviour3")]
+public class TestMonoBehaviour3 : MonoBehaviour
 {
     [Autowired]
     private TestComponent testComponent;
 
-    protected override void OnAwake()
+    private void Awake()
     {
         testComponent.Test();
     }
 }
 ```
 
-#### 3.3 Beans That Exist When the Scene Is Initialized
-
-Considering that some Beans need to exist when the scene is initialized (Including objects that are hidden by default when the scene is loaded), you can use the `[DefaultInject]` attribute, so that the Bean can be injected when the IoC container is initialized.
-
-***Note:*** You should make sure that the object is a singleton, and that the fields to be injected are also singletons marked with that attribute.
-
-Please pass in the scene name (without the path before the scene name) in the parameter, separated by commas between scenes.
-
-If a class that uses this attribute is not fully injected at the beginning of the scene load, an error will be thrown. Classes that do not use this attribute will not throw an exception because they will be registered as Beans later. Please design the generation order of GameObjects reasonably.
-
-```csharp
-[DefaultInject("SampleScene", "SampleScene2")]
-public class TestMonoBehaviour4 : BeanMonoBehaviour
-{
-    [Autowired]
-    private TestComponent testComponent;
-
-    protected override void OnAwake()
-    {
-        testComponent.Test();
-    }
-}
-```
-
-#### 3.4 Register GameObjects Without Writing GameObject Component Classes
+#### 3.3 Register GameObjects Without Writing GameObject Component Classes
 
 If you want to register GameObjects that do not have GameObject component classes written, you can attach the `EasyInject/Behaviours/BeanObject` script to the GameObject.
 
@@ -308,18 +328,48 @@ This script will register the object name as a Bean, so you need to pass in the 
 
 ***Please ensure that the object name is not duplicated, otherwise unpredictable errors may occur.***
 
-If the object is an object that will be loaded at the beginning of the scene (including objects that are hidden by default when the scene is loaded), please check the `Is Default` property of the script in Unity.
-
 ```csharp
-public class TestMonoBehaviour5 : BeanMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour4 : MonoBehaviour
 {
     // The name here is the name of the object
     [Autowired("TestObject")]
     private BeanObject testObject;
 
-    protected override void OnAwake()
+    private void Awake()
     {
         testObject.SetActive(true);
+    }
+}
+```
+
+#### 3.4 Add a New GameObject as a Bean to the Scene
+
+If you want to add a GameObject as a Bean to the scene, which is not already in the scene, you can use the `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)` method provided by the container.
+
+The method is quite different from the `Instantiate(T original, Transform parent)` method, the first parameter is a `GameObject` prototype, not a generic class `T`.
+
+Otherwise, the name of bean is required as the third parameter.
+
+Then you need to pass a type of the component class to the method, and the method will return the instance of the component class as the type of bean, which is different from the `Instantiate` method.
+
+If you have written a component to the GameObject, it is no need to use `[GameObjectBean]` attribute to mark the class.
+
+***Please ensure that the component class is attached to the GameObject, unless the generic parameter you passed in is `BeanObject` or `AcrossScenesBeanObject`, the container will automatically attach it for you, otherwise unpredictable errors may occur.***
+
+***Please check the [GameObject Component Class Bean Across Scenes](#36-gameobject-component-class-bean-across-scenes) for more information about the `AcrossScenesBeanObject`.***
+
+```csharp
+[GameObjectBean]
+public class TestMonoBehaviour5 : MonoBehaviour
+{
+    public GameObject prefab;
+    
+    private void Start()
+    {
+        // Create a new GameObject as a Bean
+        var go = GlobalInitializer.Instance.CreateGameObjectAsBean<BeanObject>(prefab, transform, "testObj");
+        go.SetActive(true);
     }
 }
 ```
@@ -328,7 +378,7 @@ public class TestMonoBehaviour5 : BeanMonoBehaviour
 
 GameObject component classes are also based on the Liskov Substitution Principle.
 
-***If the parent class or interface has multiple subclasses or implementation classes, please make sure to use the `[BeanName]` attribute to specify a name to make it unique.***
+***If the parent class or interface has multiple subclasses or implementation classes, please make sure to specify a name to make it unique.***
 
 ```csharp
 public interface ISay
@@ -336,8 +386,8 @@ public interface ISay
     void say();
 }
 
-[BeanName("TestMonoBehaviour6")]
-public class TestMonoBehaviour6 : BeanMonoBehaviour, ISay
+[GameObjectBean("TestMonoBehaviour6")]
+public class TestMonoBehaviour6 : MonoBehaviour, ISay
 {
     public void say()
     {
@@ -345,8 +395,8 @@ public class TestMonoBehaviour6 : BeanMonoBehaviour, ISay
     }
 }
 
-[BeanName("TestMonoBehaviour7")]
-public class TestMonoBehaviour7 : BeanMonoBehaviour, ISay
+[GameObjectBean("TestMonoBehaviour7")]
+public class TestMonoBehaviour7 : MonoBehaviour, ISay
 {
     public void say()
     {
@@ -354,7 +404,8 @@ public class TestMonoBehaviour7 : BeanMonoBehaviour, ISay
     }
 }
 
-public class TestMonoBehaviour8 : InjectableMonoBehaviour
+[GameObjectBean]
+public class TestMonoBehaviour8 : MonoBehaviour
 {
     [Autowired("TestMonoBehaviour6")]
     private ISay testMonoBehaviour6;
@@ -362,7 +413,7 @@ public class TestMonoBehaviour8 : InjectableMonoBehaviour
     [Autowired("TestMonoBehaviour7")]
     private ISay testMonoBehaviour7;
     
-    protected override void OnAwake()
+    private void Awake()
     {
         testMonoBehaviour6.say();
         testMonoBehaviour7.say();
@@ -374,50 +425,18 @@ public class TestMonoBehaviour8 : InjectableMonoBehaviour
 
 If you need to register a Bean across scenes, you can use the `[PersistAcrossScenes]` attribute. Please ensure that the class calls `DontDestroyOnLoad()` during initialization.
 
+If it is no need to write any component class, you can attach the `EasyInject/Behaviours/AcrossScenesBeanObject` script to the GameObject. The script is a subclass of `BeanObject` and will automatically attach the `PersistAcrossScenes` attribute.
+
 The Bean class which across scenes should be written like this:
 
 ```csharp
 [PersistAcrossScenes]
-[DefaultInject("GameScene", "MenuScene")]
-public class TestAcrossScenes : BeanMonoBehaviour
+[GameObjectBean]
+public class TestAcrossScenes : MonoBehaviour
 {
-    public string value = "Hello World!";
-    
-    protected override void OnAwake()
+    private void Awake()
     {
         DontDestroyOnLoad(gameObject);
-    }
-}
-```
-
-At MenuScene, you can inject the Bean like this:
-
-```csharp
-[DefaultInject("MenuScene")]
-public class Test1 : InjectableMonoBehaviour
-{
-    [Autowired]
-    private TestAcrossScenes _testAcrossScenes;
-
-    protected override void OnAwake()
-    {
-        Debug.Log(_testAcrossScenes.value);
-    }
-}
-```
-
-At GameScene, you can inject the Bean like this:
-
-```csharp
-[DefaultInject("GameScene")]
-public class Test2 : InjectableMonoBehaviour
-{
-    [Autowired]
-    private TestAcrossScenes _testAcrossScenes;
-
-    protected override void OnAwake()
-    {
-        Debug.Log(_testAcrossScenes.value);
     }
 }
 ```
@@ -429,7 +448,6 @@ public class Test2 : InjectableMonoBehaviour
 1. Support for more features to make the framework more like Spring Boot while still conforming to Unity.
 2. Support for more dependency injection methods, such as property injection.
 3. Support for normal C# projects, not just Unity projects.
-4. Register GameObjects without inheriting from `BeanMonoBehaviour` or `InjectableMonoBehaviour`, but using attributes.
 
 ---
 
