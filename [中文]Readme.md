@@ -9,7 +9,7 @@
     * [启动IoC容器](#1-启动ioc容器)
     * [非游戏物体组件类对象](#2-非游戏物体组件类对象)
         * [注册对象](#21-注册对象)
-        * [字段注入获取Bean](#22-字段注入获取bean)
+        * [字段或属性注入获取Bean](#22-字段或属性注入获取bean)
         * [构造函数注入获取Bean](#23-构造函数注入获取bean)
         * [Bean的名字](#24-Bean的名字)
         * [基于里氏替换原则的非游戏物体组件类Bean](#25-基于里氏替换原则的非游戏物体组件类bean)
@@ -148,9 +148,9 @@ public class TestComponent
 }
 ```
 
-#### 2.2 字段注入获取Bean
+#### 2.2 字段或属性注入获取Bean
 
-如果想使用字段注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`或`[GameObjectBean]`特性，或是在游戏过程中被作为Bean生成的游戏物体组件类。
+如果想使用字段或属性注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`或`[GameObjectBean]`特性，或是在游戏过程中被作为Bean生成的游戏物体组件类。
 
 ```csharp
 [Component]
@@ -158,10 +158,14 @@ public class TestComponent2
 {
     [Autowired]
     private TestComponent testComponent;
+    
+    [Autowired]
+    public TestComponent testComponent2 { get; set; }
 
     public void Test()
     {
         testComponent.Test();
+        testComponent2.Test();
     }
 }
 ```
@@ -449,7 +453,6 @@ public class TestAcrossScenes : MonoBehaviour
 ## 未来计划
 
 * 支持更多的特性，让框架在符合Unity的同时更加逼近SpringBoot
-* 支持更多的依赖注入方式，如属性注入
 * 适应非Unity项目的普通C#项目
 
 ---

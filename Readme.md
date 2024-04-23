@@ -9,7 +9,7 @@
     * [Start the IoC Container](#1-start-the-ioc-container)
     * [Non-GameObject Component Class Object](#2-non-gameobject-component-class-object)
         * [Register Object](#21-register-object)
-        * [Field Injection to Get Bean](#22-field-injection-to-get-bean)
+        * [Field or Property Injection to Get Bean](#22-field-or-property-injection-to-get-bean)
         * [Constructor Injection to Get Bean](#23-constructor-injection-to-get-bean)
         * [Bean Name](#24-bean-name)
         * [Non-GameObject Component Class Bean Based on Liskov Substitution Principle](#25-non-gameobject-component-class-bean-based-on-liskov-substitution-principle)
@@ -150,9 +150,9 @@ public class TestComponent
 }
 ```
 
-#### 2.2 Field Injection to Get Bean
+#### 2.2 Field or Property Injection to Get Bean
 
-You can use the `[Autowired]` attribute to inject the Bean into the field.
+You can use the `[Autowired]` attribute to inject the Bean into the field or property where you need to use it.
 
 The injected class must also have the `[Component]` or `[GameObjectBean]` attribute, or any GameObject component class that is generated as a Bean during the game.
 
@@ -162,10 +162,14 @@ public class TestComponent2
 {
     [Autowired]
     private TestComponent testComponent;
+    
+    [Autowired]
+    public TestComponent testComponent2 { get; set; }
 
     public void Test()
     {
         testComponent.Test();
+        testComponent2.Test();
     }
 }
 ```
@@ -457,8 +461,7 @@ public class TestAcrossScenes : MonoBehaviour
 ## Future Plans
 
 1. Support for more features to make the framework more like Spring Boot while still conforming to Unity.
-2. Support for more dependency injection methods, such as property injection.
-3. Support for normal C# projects, not just Unity projects.
+2. Support for normal C# projects, not just Unity projects.
 
 ---
 

@@ -132,7 +132,6 @@ namespace EasyInject.Utils
         /// <summary>
         /// 注入非MonoBehavior实例
         /// </summary>
-        /// <exception cref="Exception">没有找到对应的实例</exception>
         private void InitNormalBean()
         {
             // 扫描所有程序集中打了Component特性的类
@@ -200,7 +199,7 @@ namespace EasyInject.Utils
                 }
             }
 
-            // 开始进行字段的依赖注入
+            // 开始进行字段和属性的依赖注入
             foreach (var type in _beans.Keys.ToList())
             {
                 var instance = _beans[type];
@@ -211,9 +210,12 @@ namespace EasyInject.Utils
                     continue;
                 }
 
-                var fields = instance.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                // 获得打了Autowired特性的字段
+                var fields = instance.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
 
+                var injected = new HashSet<string>();
+                
                 foreach (var field in fields)
                 {
                     // 如果Autowired传了名字参数，名字和类型都要匹配
@@ -223,10 +225,32 @@ namespace EasyInject.Utils
                     if (_beans.TryGetValue(beanInfo, out var value))
                     {
                         field.SetValue(instance, value);
+                        injected.Add(field.Name);
                     }
                     else
                     {
-                        throw new Exception($"No service of type {field.FieldType} found for autowiring");
+                        _shelvedInstances.Add(new ShelvedInstance(type.Name, instance), injected);
+                    }
+                }
+                
+                // 获得打了Autowired特性的属性
+                var properties = instance.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(p => p.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
+
+                foreach (var property in properties)
+                {
+                    // 如果Autowired传了名字参数，名字和类型都要匹配
+                    var name = property.GetCustomAttribute<AutowiredAttribute>()?.Name;
+                    var beanInfo = new BeanInfo(name, property.PropertyType);
+                    // 如果IoC容器中有这个类型的实例，就注入
+                    if (_beans.TryGetValue(beanInfo, out var value))
+                    {
+                        property.SetValue(instance, value);
+                        injected.Add(property.Name);
+                    }
+                    else
+                    {
+                        _shelvedInstances.Add(new ShelvedInstance(type.Name, instance), injected);
                     }
                 }
             }
@@ -243,26 +267,55 @@ namespace EasyInject.Utils
         private void Inject(string beanName, object instance)
         {
             var type = instance.GetType();
-            var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            
+            // 字段注入
+            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                 .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0);
 
+            var injected = new HashSet<string>();
+            
             foreach (var field in fields)
             {
                 // 如果Autowired传了名字参数，名字和类型都要匹配
                 var name = field.GetCustomAttribute<AutowiredAttribute>()?.Name;
                 var beanInfo = new BeanInfo(name, field.FieldType);
-                var injectedFields = new HashSet<string>();
+                
                 // 如果IoC容器中有这个类型的实例，就注入
                 if (_beans.TryGetValue(beanInfo, out var value))
                 {
                     field.SetValue(instance, value);
-                    injectedFields.Add(field.Name);
+                    injected.Add(field.Name);
                 }
                 else
                 {
                     var insKey = new ShelvedInstance(beanName, instance);
                     // 暂时放入_shelvedInstances中，等到有实例的时候再注入
-                    _shelvedInstances.Add(insKey, injectedFields);
+                    _shelvedInstances.Add(insKey, injected);
+                    break;
+                }
+            }
+            
+            // 属性注入
+            var properties = type.GetProperties( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(p => p.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0);
+            
+            foreach (var property in properties)
+            {
+                // 如果Autowired传了名字参数，名字和类型都要匹配
+                var name = property.GetCustomAttribute<AutowiredAttribute>()?.Name;
+                var beanInfo = new BeanInfo(name, property.PropertyType);
+                
+                // 如果IoC容器中有这个类型的实例，就注入
+                if (_beans.TryGetValue(beanInfo, out var value))
+                {
+                    property.SetValue(instance, value);
+                    injected.Add(property.Name);
+                }
+                else
+                {
+                    var insKey = new ShelvedInstance(beanName, instance);
+                    // 暂时放入_shelvedInstances中，等到有实例的时候再注入
+                    _shelvedInstances.Add(insKey, injected);
                     break;
                 }
             }
@@ -295,16 +348,20 @@ namespace EasyInject.Utils
         /// </summary>
         private void CheckShelvedInstances()
         {
-            foreach (var (key, injectedFields) in _shelvedInstances.ToList())
+            foreach (var (key, injected) in _shelvedInstances.ToList())
             {
-                var insFields = key.Instance.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                var insFields = key.Instance.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
-                var count = insFields.Count;
+                
+                var insProperties = key.Instance.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(p => p.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
+                
+                var count = insFields.Count + insProperties.Count;
 
                 foreach (var field in insFields)
                 {
                     // 如果已经注入过了，就跳过
-                    if (injectedFields.Contains(field.Name))
+                    if (injected.Contains(field.Name))
                     {
                         count--;
                         continue;
@@ -320,7 +377,30 @@ namespace EasyInject.Utils
                     }
 
                     field.SetValue(key.Instance, value);
-                    injectedFields.Add(field.Name);
+                    injected.Add(field.Name);
+                    count--;
+                }
+                
+                foreach (var property in insProperties)
+                {
+                    // 如果已经注入过了，就跳过
+                    if (injected.Contains(property.Name))
+                    {
+                        count--;
+                        continue;
+                    }
+
+                    // 如果Autowired传了名字参数，名字和类型都要匹配
+                    var name = property.GetCustomAttribute<AutowiredAttribute>().Name;
+                    var beanInfo = new BeanInfo(name, property.PropertyType);
+                    // 如果IoC容器中有这个类型的实例，就注入
+                    if (!_beans.TryGetValue(beanInfo, out var value))
+                    {
+                        continue;
+                    }
+
+                    property.SetValue(key.Instance, value);
+                    injected.Add(property.Name);
                     count--;
                 }
 
