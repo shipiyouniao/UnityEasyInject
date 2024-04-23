@@ -140,9 +140,20 @@ namespace EasyInject.Utils
                 monoBehaviour.GetType().GetCustomAttribute<GameObjectBeanAttribute>() != null).ToList();
             foreach (var gameObjectBean in gameObjectBeans)
             {
-                var name = gameObjectBean.GetType().GetCustomAttribute<GameObjectBeanAttribute>().Name;
+                var attribute = gameObjectBean.GetType().GetCustomAttribute<GameObjectBeanAttribute>();
+
+                // 先获取NameType，再根据NameType获取名字
+                var name = attribute.NameType switch
+                {
+                    ENameType.Custom => attribute.Name,
+                    ENameType.ClassName => gameObjectBean.GetType().Name,
+                    ENameType.GameObjectName => gameObjectBean.name,
+                    _ => string.Empty
+                };
+
                 // 如果已经存在，就不再添加（一般是因为这是持久化的对象）
                 if (_beans.ContainsKey(new BeanInfo(name, gameObjectBean.GetType()))) continue;
+
                 AddBean(name, gameObjectBean);
             }
         }
@@ -229,11 +240,12 @@ namespace EasyInject.Utils
                 }
 
                 // 获得打了Autowired特性的字段
-                var fields = instance.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                var fields = instance.GetType()
+                    .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
 
                 var injected = new HashSet<string>();
-                
+
                 foreach (var field in fields)
                 {
                     // 如果Autowired传了名字参数，名字和类型都要匹配
@@ -250,9 +262,10 @@ namespace EasyInject.Utils
                         _shelvedInstances.Add(new ShelvedInstance(type.Name, instance), injected);
                     }
                 }
-                
+
                 // 获得打了Autowired特性的属性
-                var properties = instance.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                var properties = instance.GetType()
+                    .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(p => p.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
 
                 foreach (var property in properties)
@@ -285,19 +298,19 @@ namespace EasyInject.Utils
         private void Inject(string beanName, object instance)
         {
             var type = instance.GetType();
-            
+
             // 字段注入
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                 .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0);
 
             var injected = new HashSet<string>();
-            
+
             foreach (var field in fields)
             {
                 // 如果Autowired传了名字参数，名字和类型都要匹配
                 var name = field.GetCustomAttribute<AutowiredAttribute>()?.Name;
                 var beanInfo = new BeanInfo(name, field.FieldType);
-                
+
                 // 如果IoC容器中有这个类型的实例，就注入
                 if (_beans.TryGetValue(beanInfo, out var value))
                 {
@@ -312,17 +325,17 @@ namespace EasyInject.Utils
                     break;
                 }
             }
-            
+
             // 属性注入
-            var properties = type.GetProperties( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            var properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                 .Where(p => p.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0);
-            
+
             foreach (var property in properties)
             {
                 // 如果Autowired传了名字参数，名字和类型都要匹配
                 var name = property.GetCustomAttribute<AutowiredAttribute>()?.Name;
                 var beanInfo = new BeanInfo(name, property.PropertyType);
-                
+
                 // 如果IoC容器中有这个类型的实例，就注入
                 if (_beans.TryGetValue(beanInfo, out var value))
                 {
@@ -368,12 +381,14 @@ namespace EasyInject.Utils
         {
             foreach (var (key, injected) in _shelvedInstances.ToList())
             {
-                var insFields = key.Instance.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                var insFields = key.Instance.GetType()
+                    .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(f => f.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
-                
-                var insProperties = key.Instance.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+
+                var insProperties = key.Instance.GetType()
+                    .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(p => p.GetCustomAttributes(typeof(AutowiredAttribute), true).Length > 0).ToList();
-                
+
                 var count = insFields.Count + insProperties.Count;
 
                 foreach (var field in insFields)
@@ -398,7 +413,7 @@ namespace EasyInject.Utils
                     injected.Add(field.Name);
                     count--;
                 }
-                
+
                 foreach (var property in insProperties)
                 {
                     // 如果已经注入过了，就跳过
@@ -430,7 +445,7 @@ namespace EasyInject.Utils
         }
 
         /// <summary>
-        /// 按照继承链注册自己、父类和接口（包括注册到Object）
+        /// 按照继承链注册自己、父类和接口
         /// </summary>
         /// <param name="name">bean的名称</param>
         /// <param name="instance">bean的实例</param>
@@ -440,11 +455,16 @@ namespace EasyInject.Utils
             name ??= string.Empty;
             // 注册自己
             var beanInfo = new BeanInfo(name, type);
-            _beans[beanInfo] = instance;
+            
+            if (!_beans.TryAdd(beanInfo, instance))
+            {
+                throw new Exception($"Bean {name} already exists");
+            }
 
             // 注册父类
             var baseType = type.BaseType;
-            if (baseType != null)
+            if (baseType != null && baseType != typeof(object) && baseType.Namespace != null &&
+                !baseType.Namespace.Contains("UnityEngine"))
             {
                 RegisterTypeAndParentsAndInterfaces(name, instance, baseType);
             }

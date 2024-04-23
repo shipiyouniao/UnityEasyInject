@@ -205,6 +205,8 @@ You can use the `name` parameter of the `[Component]` attribute to specify the n
 
 Then you can use the `[Autowired]` attribute to inject the Bean by name.
 
+This is a good way to make beans unique if they have the same parent class or interface. (Except for `object` or classes in the `UnityEngine` namespace)
+
 ```csharp
 [Component(name: "TestComponent4")]
 public class TestComponent4
@@ -248,7 +250,7 @@ public class TestComponent6
 
 #### 2.5 Non-GameObject Component Class Bean Based on Liskov Substitution Principle
 
-If a class inherits another class or implements an interface, the parent class or interface and the parent class's parent class and interface (and so on) will also be registered as the corresponding information of the Bean instance.
+If a class inherits another class or implements an interface, the parent class or interface and the parent class's parent class and interface (and so on, except for `object` or classes in the `UnityEngine` namespace) will also be registered as the corresponding information of the Bean instance.
 
 ***If the parent class or interface has multiple subclasses or implementation classes, please make sure to use the `[Component]` attribute to specify a name to make it unique.***
 
@@ -340,6 +342,39 @@ public class TestMonoBehaviour3 : MonoBehaviour
 }
 ```
 
+Another way to inject the Bean by name is to use the `ENameType` enumeration type.
+
+* `Custom`: Use the custom name, which is the default value. You do not need to specify this value. This selection is usually used when the instance of the class is unique.
+* `ClassName`: Use the class name as the name of the Bean. Although this selection is usually used when the instance of the parent class is Bean, we still do not recommend using it to make the Bean unique. 
+* `GameObjectName`: Use the name of the GameObject as the name of the Bean. This selection is usually used when the script is attached to a few GameObjects at the same time, which is a good way to make the Bean unique.
+
+```csharp
+[GameObjectBean(ENameType.GameObjectName)]
+public class TestGameObj : MonoBehaviour
+{
+    [Autowired]
+    private TestComponent testComponent;
+
+    private void Awake()
+    {
+        testComponent.Test();
+    }
+}
+
+[GameObjectBean]
+public class TestMonoBehaviour3 : MonoBehaviour
+{
+    // Assume that the name of the GameObject is "TestGameObj"
+    [Autowired("TestGameObj")]
+    private TestGameObj testGameObj;
+
+    private void Awake()
+    {
+        testGameObj.gameObject.SetActive(true);
+    }
+}
+```
+
 #### 3.3 Register GameObjects Without Writing GameObject Component Classes
 
 If you want to register GameObjects that do not have GameObject component classes written, you can attach the `EasyInject/Behaviours/BeanObject` script to the GameObject.
@@ -394,7 +429,7 @@ public class TestMonoBehaviour5 : MonoBehaviour
 
 #### 3.5 GameObject Component Class Bean Based on Liskov Substitution Principle
 
-GameObject component classes are also based on the Liskov Substitution Principle.
+GameObject component classes are also based on the Liskov Substitution Principle. (Except for `object` or classes in the `UnityEngine` namespace)
 
 ***If the parent class or interface has multiple subclasses or implementation classes, please make sure to specify a name to make it unique.***
 

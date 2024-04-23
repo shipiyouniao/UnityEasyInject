@@ -199,6 +199,8 @@ public class TestComponent3
 
 `[Component]`特性还可以接受一个字符串参数，用于指定Bean的名字，但如果使用构造函数，参数上也要使用`[Autowired]`特性传入名字。
 
+这种做法常用于使拥有相同父类或接口的多个子类或实现类唯一化。（不包含`object`以及命名空间包含`UnityEngine`的类）
+
 ```csharp
 [Component("TestComponent4")]
 public class TestComponent4
@@ -242,7 +244,7 @@ public class TestComponent6
 
 #### 2.5 基于里氏替换原则的非游戏物体组件类Bean
 
-如果一个类继承了另一个类，或者实现了接口，那么父类或接口以及父类的父类和接口（以此类推）也会被作为对应的信息存储这个Bean实例。
+如果一个类继承了另一个类，或者实现了接口，那么父类或接口以及父类的父类和接口（以此类推，不包含`object`以及命名空间包含`UnityEngine`的类）也会被作为对应的信息存储这个Bean实例。
 
 ***如果父类或接口有多个子类或实现类，那么请务必在子类或实现类使用`[Component]`指定名字使其唯一化。***
 
@@ -332,6 +334,41 @@ public class TestMonoBehaviour3 : MonoBehaviour
 }
 ```
 
+此外，框架提供了一个`ENameType`枚举，用于指定Bean的名字类型。
+
+* `Custom`：自定义名字，默认值，不需要您手动指定，一般用于脚本是单例的情况。
+* `ClassName`：使用类名作为Bean的名字，一般用于脚本的父类也是Bean的情况，通过类名使Bean唯一化，不推荐使用。
+* `GameObjectName`：使用物体的名字作为Bean的名字，一般用于一个脚本挂载在多个物体上的情况，通过物体名使Bean唯一化。
+
+因此，如果您不想手动指定名字，或是想要动态地使用物体名作为名字，可以使用`ENameType`枚举。
+
+```csharp
+[GameObjectBean(ENameType.GameObjectName)]
+public class TestGameObj : MonoBehaviour
+{
+    [Autowired]
+    private TestComponent testComponent;
+
+    private void Awake()
+    {
+        testComponent.Test();
+    }
+}
+
+[GameObjectBean]
+public class TestMonoBehaviour3 : MonoBehaviour
+{
+    // 这里假设物体名为TestGameObj
+    [Autowired("TestGameObj")]
+    private TestGameObj testGameObj;
+
+    private void Awake()
+    {
+        testGameObj.gameObject.SetActive(true);
+    }
+}
+```
+
 #### 3.3 注册没有编写游戏物体组件类的游戏对象
 
 如果您想要把没有编写游戏物体组件类的游戏对象注册为Bean，可以在物体上挂载`EasyInject/Behaviours/BeanObject`脚本。
@@ -386,7 +423,7 @@ public class TestMonoBehaviour5 : MonoBehaviour
 
 #### 3.5 基于里氏替换原则的游戏物体组件类Bean
 
-游戏物体组件类也可以基于里氏替换原则进行注册。
+游戏物体组件类也可以基于里氏替换原则进行注册（不包含`object`以及命名空间包含`UnityEngine`的类）。
 
 ***如果有多个子类或实现类，那么请务必在子类或实现类当中指定名字使其唯一化。***
 
