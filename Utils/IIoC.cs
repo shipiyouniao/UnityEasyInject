@@ -13,6 +13,15 @@ namespace EasyInject.Utils
         /// <typeparam name="T">Bean类型</typeparam>
         /// <returns>Bean实例</returns>
         T CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName) where T : MonoBehaviour;
+        
+        /// <summary>
+        /// 删除一个持久化的Bean
+        /// </summary>
+        /// <param name="bean">Bean实例</param>
+        /// <param name="beanName">Bean名字</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>是否删除成功</returns>
+        bool DeletePersistBean<T>(T bean, string beanName = "") where T : MonoBehaviour;
 
         /// <summary>
         /// 获取一个Bean

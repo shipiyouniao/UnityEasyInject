@@ -128,6 +128,7 @@ IoC容器提供了三个方法：
 * `Init()`：在每个场景开始时初始化IoC容器，注册所有的Bean。
 * `GetBean<T>(string name = "")`：获取一个Bean，不填写名字则以空字符串作为名字。
 * `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`：创建一个物体作为Bean。
+* `DeletePersistBean<T>(T bean, string beanName = "")`：删除一个跨场景的Bean。
 
 ### 2. 非游戏物体组件类对象
 
@@ -435,6 +436,9 @@ public class TestMonoBehaviour8 : MonoBehaviour
 如果您的游戏物体组件类是跨场景的，必须使用`[PersistAcrossScenes]`特性。同时请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
 
 如果您的游戏对象没有编写游戏组件类，可以为其挂载`AcrossScenesBeanObject`脚本。这个脚本是`BeanObject`的子类，会自动挂载`PersistAcrossScenes`特性。
+
+如果您需要销毁一个跨场景的Bean，应该使用`DeletePersistBean<T>(T bean, string beanName = "")`方法，而不是直接销毁物体。
+在您传入的Bean标记了`[PersistAcrossScenes]`特性，且名字正确时，这个方法才会将Bean删除后返回`true`，否则返回`false`。
 
 ```csharp
 [PersistAcrossScenes]

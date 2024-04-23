@@ -64,6 +64,24 @@ namespace EasyInject.Utils
         }
 
         /// <summary>
+        /// 删除一个持久化的Bean
+        /// </summary>
+        /// <param name="bean">Bean实例</param>
+        /// <param name="beanName">Bean名字</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>是否删除成功</returns>
+        public bool DeletePersistBean<T>(T bean, string beanName = "") where T : MonoBehaviour
+        {
+            if (bean == null) return false;
+            if (bean.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() == null) return false;
+            var beanInfo = new BeanInfo(beanName, typeof(T));
+            if (!_beans.ContainsKey(beanInfo)) return false;
+            _beans.Remove(beanInfo);
+            UnityEngine.Object.Destroy(bean.gameObject);
+            return true;
+        }
+
+        /// <summary>
         /// 获取一个Bean
         /// </summary>
         /// <param name="name">Bean的名字</param>

@@ -130,6 +130,7 @@ The IoC container provides three methods:
 * `Init()`: Initialize the IoC container.
 * `GetBean<T>(string name = "")`: Get a Bean by name, if the name is not specified, an empty string will be used.
 * `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`：Create a GameObject as a Bean.
+* `DeletePersistBean<T>(T bean, string beanName = "")`: Delete a Bean across scenes.
 
 ### 2. Non-GameObject Component Class Object
 
@@ -443,6 +444,9 @@ public class TestMonoBehaviour8 : MonoBehaviour
 If you need to register a Bean across scenes, you can use the `[PersistAcrossScenes]` attribute. Please ensure that the class calls `DontDestroyOnLoad()` during initialization.
 
 If it is no need to write any component class, you can attach the `EasyInject/Behaviours/AcrossScenesBeanObject` script to the GameObject. The script is a subclass of `BeanObject` and will automatically attach the `PersistAcrossScenes` attribute.
+
+If you need to delete the Bean across scenes, you should use the `DeletePersistBean<T>(T bean, string beanName = "")` method provided by the container, instead of destroying the GameObject directly.
+When the Bean you passed in is marked with the `[PersistAcrossScenes]` attribute and the name is correct, the method will delete the Bean and return `true`, otherwise it will return `false`.
 
 ```csharp
 [PersistAcrossScenes]
