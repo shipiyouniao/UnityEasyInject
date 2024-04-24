@@ -127,7 +127,14 @@ namespace EasyInject.Utils
         private void GetDefaultMonoBehaviourInfo()
         {
             // 获得场景上所有挂载了BeanObject的物体
-            var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>().ToList();
+            var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>()
+                // 非运行时环境下，如果预制体也在场景中，会把场景中物件和预制体都找到导致重复，因此必须筛选出来
+#if UNITY_EDITOR
+                .Where(beanObject => !UnityEditor.PrefabUtility.IsPartOfPrefabAsset(beanObject) &&
+                                     !UnityEditor.PrefabUtility.IsPartOfPrefabInstance(beanObject))
+#endif
+                .ToList();
+
             foreach (var beanObject in beanObjects.Where(beanObject =>
                          !_beans.ContainsKey(new BeanInfo(beanObject.name, typeof(BeanObject)))))
             {
@@ -137,7 +144,13 @@ namespace EasyInject.Utils
 
             // 获得场景上所有挂载了GameObjectBeanAttribute的物体
             var gameObjectBeans = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(monoBehaviour =>
-                monoBehaviour.GetType().GetCustomAttribute<GameObjectBeanAttribute>() != null).ToList();
+                    monoBehaviour.GetType().GetCustomAttribute<GameObjectBeanAttribute>() != null)
+                // 非运行时环境下，如果预制体也在场景中，会把场景中物件和预制体都找到导致重复，因此必须筛选出来
+#if UNITY_EDITOR
+                .Where(monoBehaviour => !UnityEditor.PrefabUtility.IsPartOfPrefabAsset(monoBehaviour) &&
+                                        !UnityEditor.PrefabUtility.IsPartOfPrefabInstance(monoBehaviour))
+#endif
+                .ToList();
             foreach (var gameObjectBean in gameObjectBeans)
             {
                 var attribute = gameObjectBean.GetType().GetCustomAttribute<GameObjectBeanAttribute>();
@@ -455,7 +468,7 @@ namespace EasyInject.Utils
             name ??= string.Empty;
             // 注册自己
             var beanInfo = new BeanInfo(name, type);
-            
+
             if (!_beans.TryAdd(beanInfo, instance))
             {
                 throw new Exception($"Bean {name} already exists");
