@@ -20,6 +20,7 @@
         * [为场景添加一个作为Bean的物体](#34-为场景添加一个作为bean的物体)
         * [基于里氏替换原则的游戏物体组件类Bean](#35-基于里氏替换原则的游戏物体组件类bean)
         * [跨场景的Bean](#36-跨场景的bean)
+        * [删除一个游戏物体Bean](#37-删除一个游戏物体bean)
 * [未来计划](#未来计划)
 * [联系方式](#联系方式)
 
@@ -43,7 +44,8 @@ Unity Easy Inject是一个Unity依赖注入（DI）框架，它可以帮助你�
 * **基于特性**：使用特性进行Bean的注册，不需要额外的配置文件。
 * **耦合度低**：使用依赖注入，可以降低组件之间的耦合度，使得项目更加易于维护和扩展。
 
-平时使用Unity开发项目时，我们经常会遇到这样的问题：当一个游戏组件需要使用另一个游戏组件时，我们需要为组件添加一个`public`修饰的字段，然后在Unity编辑器中手动拖拽另一个组件到这个字段上。
+平时使用Unity开发项目时，我们经常会遇到这样的问题：当一个游戏组件需要使用另一个游戏组件时，我们需要为组件添加一个`public`
+修饰的字段，然后在Unity编辑器中手动拖拽另一个组件到这个字段上。
 
 这样的做法虽然简单，但是当项目变得越来越大时，这样的做法就会变得越来越麻烦，并且耦合度也会变得越来越高。
 
@@ -95,7 +97,9 @@ public class TestMonoBehaviour : MonoBehaviour
 
 ### 2. 使用Unity Package Manager安装
 
-在仓库界面点击Releases，下载最新的Unity Package文件（*.unitypackage），然后在Unity中选择`Assets（资源）` -> `Import Package（导入包）` -> `Custom Package（自定义包...）`，选择下载的Unity Package文件即可。
+在仓库界面点击Releases，下载最新的Unity Package文件（*
+.unitypackage），然后在Unity中选择`Assets（资源）` -> `Import Package（导入包）` -> `Custom Package（自定义包...）`，选择下载的Unity
+Package文件即可。
 
 ---
 
@@ -123,12 +127,13 @@ public class GlobalInitializer : MonoBehaviour
 }
 ```
 
-IoC容器提供了三个方法：
+IoC容器提供了五个方法：
 
 * `Init()`：在每个场景开始时初始化IoC容器，注册所有的Bean。
 * `GetBean<T>(string name = "")`：获取一个Bean，不填写名字则以空字符串作为名字。
-* `CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`：创建一个物体作为Bean。
-* `DeletePersistBean<T>(T bean, string beanName = "")`：删除一个跨场景的Bean。
+* `CreateGameObjectAsBean<T>(...)`：创建一个物体作为Bean，类似于Unity的`Instantiate`方法。
+* `DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)`：删除一个游戏物体Bean。
+* `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`：立即删除一个游戏物体Bean。
 
 ### 2. 非游戏物体组件类对象
 
@@ -151,7 +156,8 @@ public class TestComponent
 
 #### 2.2 字段或属性注入获取Bean
 
-如果想使用字段或属性注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`或`[GameObjectBean]`特性，或是在游戏过程中被作为Bean生成的游戏物体组件类。
+如果想使用字段或属性注入，在需要使用的地方使用`[Autowired]`特性进行注入。被注入的类也必须有`[Component]`
+或`[GameObjectBean]`特性，或是在游戏过程中被作为Bean生成的游戏物体组件类。
 
 ```csharp
 [Component]
@@ -244,7 +250,8 @@ public class TestComponent6
 
 #### 2.5 基于里氏替换原则的非游戏物体组件类Bean
 
-如果一个类继承了另一个类，或者实现了接口，那么父类或接口以及父类的父类和接口（以此类推，不包含`object`以及命名空间包含`UnityEngine`的类）也会被作为对应的信息存储这个Bean实例。
+如果一个类继承了另一个类，或者实现了接口，那么父类或接口以及父类的父类和接口（以此类推，不包含`object`
+以及命名空间包含`UnityEngine`的类）也会被作为对应的信息存储这个Bean实例。
 
 ***如果父类或接口有多个子类或实现类，那么请务必在子类或实现类使用`[Component]`指定名字使其唯一化。***
 
@@ -394,17 +401,43 @@ public class TestMonoBehaviour4 : MonoBehaviour
 
 #### 3.4 为场景添加一个作为Bean的物体
 
-如果您想要把一个物体作为Bean，但是这个物体不是初始就会被加载的物体，容器提供了一个名为`CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)`的方法。
+如果您想要把一个物体作为Bean，但是这个物体不是初始就会被加载的物体，容器提供了一个名为`CreateGameObjectAsBean<T>(GameObject original, string beanName, ...)`
+的方法。
 
-与Unity提供的`Instantiate(T original, Transform parent)`方法不同，这个方法需要传入一个`GameObject`作为原型，而非泛型类`T`。
+该方法一共有如下几个重载：
+
+`CreateGameObjectAsBean<T>(GameObject original, string beanName)`
+
+`CreateGameObjectAsBean<T>(GameObject original, string beanName, Transform parent)`
+
+`CreateGameObjectAsBean<T>(GameObject original, string beanName, Transform parent, bool instantiateInWorldSpace)`
+
+`CreateGameObjectAsBean<T>(GameObject original, string beanName, Vector3 position, Quaternion rotation)`
+
+`CreateGameObjectAsBean<T>(GameObject original, string beanName, Vector3 position, Quaternion rotation, Transform parent)`
+
+与Unity提供的`Instantiate(T original, ...)`方法不同，这个方法需要传入一个`GameObject`作为原型，而非泛型类`T`。
 
 此外，你还需要传入一个字符串作为Bean的名字，然后在方法泛型参数中传入你挂载在物体上的脚本，也就是Bean的类型。
 
-方法也将返回一个被字段注入完成的`T`类型的对象，这与Unity的`Instantiate(T original, Transform parent)`方法返回original的实例不同。
+方法也将返回一个被字段注入完成的`T`类型的对象，这与Unity的`Instantiate`方法返回original的实例不同。
 
 如果您为物体编写了游戏物体组件类，组件的上方不需要标注`[GameObjectBean]`特性。
 
-***请确保这个物体上也挂载了与您传入的泛型参数相同的脚本，除非您传入的泛型参数是`BeanObject`或`AcrossScenesBeanObject`，容器会自动帮您挂载，否则会导致不可预知的错误。`AcrossScenesBeanObject`相关的内容请参考[跨场景的Bean](#36-跨场景的bean)。***
+***请确保这个物体上也挂载了与您传入的泛型参数相同的脚本，除非您传入的泛型参数是`BeanObject`或`AcrossScenesBeanObject`
+，容器会自动帮您挂载，否则会导致不可预知的错误。`AcrossScenesBeanObject`相关的内容请参考[跨场景的Bean](#36-跨场景的bean)。
+***
+
+下表将介绍该方法的所有参数：
+
+| 参数                      | 类型         | 描述          |
+|-------------------------|------------|-------------|
+| original                | GameObject | 作为Bean的原型物体 |
+| beanName                | string     | Bean的名字     |
+| parent                  | Transform  | 父物体         |
+| position                | Vector3    | 位置          |
+| rotation                | Quaternion | 旋转          |
+| instantiateInWorldSpace | bool       | 是否在世界空间中实例化 |
 
 ```csharp
 [GameObjectBean]
@@ -415,7 +448,7 @@ public class TestMonoBehaviour5 : MonoBehaviour
     private void Start()
     {
         // 创建一个物体作为Bean
-        var go = GlobalInitializer.Instance.CreateGameObjectAsBean<BeanObject>(prefab, transform, "testObj");
+        var go = GlobalInitializer.Instance.CreateGameObjectAsBean<BeanObject>(prefab, "testObj", transform);
         go.SetActive(true);
     }
 }
@@ -470,12 +503,11 @@ public class TestMonoBehaviour8 : MonoBehaviour
 
 #### 3.6 跨场景的Bean
 
-如果您的游戏物体组件类是跨场景的，必须使用`[PersistAcrossScenes]`特性。同时请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
+如果您的游戏物体组件类是跨场景的，必须使用`[PersistAcrossScenes]`
+特性。同时请确保这个类在初始化时调用了`DontDestroyOnLoad()`。
 
-如果您的游戏对象没有编写游戏组件类，可以为其挂载`AcrossScenesBeanObject`脚本。这个脚本是`BeanObject`的子类，会自动挂载`PersistAcrossScenes`特性。
-
-如果您需要销毁一个跨场景的Bean，应该使用`DeletePersistBean<T>(T bean, string beanName = "")`方法，而不是直接销毁物体。
-在您传入的Bean标记了`[PersistAcrossScenes]`特性，且名字正确时，这个方法才会将Bean删除后返回`true`，否则返回`false`。
+如果您的游戏对象没有编写游戏组件类，可以为其挂载`AcrossScenesBeanObject`脚本。这个脚本是`BeanObject`
+的子类，会自动挂载`PersistAcrossScenes`特性。
 
 ```csharp
 [PersistAcrossScenes]
@@ -489,12 +521,34 @@ public class TestAcrossScenes : MonoBehaviour
 }
 ```
 
+#### 3.7 删除一个游戏物体Bean
+
+如果您想要删除一个游戏物体Bean，请不要直接使用`Destroy`方法，因为这样会导致容器中的Bean信息没有被删除。
+
+容器提供了`DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)`方法。
+
+与`Destroy`方法类似，其中，`bean`是您想要删除的Bean组件类，`beanName`是Bean的名字，`deleteGameObj`表示是否删除物体，`t`是延迟删除的时间。
+
+此外，还提供了`DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`方法，立即删除一个游戏物体Bean，但不推荐使用，因为会降低性能。
+
+```csharp
+[GameObjectBean]
+public class TestMonoBehaviour9 : MonoBehaviour
+{
+    private void Start()
+    {
+        // 删除一个游戏物体Bean
+        GlobalInitializer.Instance.DeleteGameObjBean<TestMonoBehaviour9>(this, "", true);
+    }
+}
+```
+
 ---
 
 ## 未来计划
 
 * 支持更多的特性，让框架在符合Unity的同时更加逼近SpringBoot
-* 适应非Unity项目的普通C#项目
+* 优化切换场景时初始化IoC容器的逻辑
 
 ---
 

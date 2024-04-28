@@ -6,6 +6,7 @@ using EasyInject.Attributes;
 using EasyInject.Behaviours;
 using EasyInject.Models;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace EasyInject.Utils
 {
@@ -25,15 +26,89 @@ namespace EasyInject.Utils
         /// 创建一个GameObject作为Bean
         /// </summary>
         /// <param name="original">原型</param>
-        /// <param name="parent">父物体</param>
         /// <param name="beanName">名字</param>
         /// <typeparam name="T">Bean类型</typeparam>
         /// <returns>Bean实例</returns>
-        public T CreateGameObjectAsBean<T>(GameObject original, Transform parent, string beanName)
+        public T CreateGameObjectAsBean<T>(GameObject original, string beanName) where T : MonoBehaviour
+        {
+            var go = Object.Instantiate(original);
+            return CheckNewGameObj<T>(go, beanName);
+        }
+
+        /// <summary>
+        /// 创建一个GameObject作为Bean
+        /// </summary>
+        /// <param name="original">原型</param>
+        /// <param name="beanName">名字</param>
+        /// <param name="parent">父物体</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>Bean实例</returns>
+        public T CreateGameObjectAsBean<T>(GameObject original, string beanName, Transform parent)
             where T : MonoBehaviour
         {
-            var go = UnityEngine.Object.Instantiate(original, parent);
+            var go = Object.Instantiate(original, parent);
+            return CheckNewGameObj<T>(go, beanName);
+        }
 
+        /// <summary>
+        /// 创建一个GameObject作为Bean
+        /// </summary>
+        /// <param name="original">原型</param>
+        /// <param name="beanName">名字</param>
+        /// <param name="parent">父物体</param>
+        /// <param name="instantiateInWorldSpace">是否在世界空间中实例化</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>Bean实例</returns>
+        public T CreateGameObjectAsBean<T>(GameObject original, string beanName, Transform parent,
+            bool instantiateInWorldSpace) where T : MonoBehaviour
+        {
+            var go = Object.Instantiate(original, parent, instantiateInWorldSpace);
+            return CheckNewGameObj<T>(go, beanName);
+        }
+
+        /// <summary>
+        /// 创建一个GameObject作为Bean
+        /// </summary>
+        /// <param name="original">原型</param>
+        /// <param name="beanName">名字</param>
+        /// <param name="position">位置</param>
+        /// <param name="rotation">旋转</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>Bean实例</returns>
+        public T CreateGameObjectAsBean<T>(GameObject original, string beanName, Vector3 position, Quaternion rotation)
+            where T : MonoBehaviour
+        {
+            var go = Object.Instantiate(original, position, rotation);
+            return CheckNewGameObj<T>(go, beanName);
+        }
+
+        /// <summary>
+        /// 创建一个GameObject作为Bean
+        /// </summary>
+        /// <param name="original">原型</param>
+        /// <param name="beanName">名字</param>
+        /// <param name="position">位置</param>
+        /// <param name="rotation">旋转</param>
+        /// <param name="parent">父物体</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>Bean实例</returns>
+        public T CreateGameObjectAsBean<T>(GameObject original, string beanName, Vector3 position, Quaternion rotation,
+            Transform parent) where T : MonoBehaviour
+        {
+            var go = Object.Instantiate(original, position, rotation, parent);
+            return CheckNewGameObj<T>(go, beanName);
+        }
+
+        /// <summary>
+        /// 检查新物体是否符合创建Bean的条件
+        /// </summary>
+        /// <param name="go">游戏物体</param>
+        /// <param name="beanName">Bean名字</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>Bean实例</returns>
+        /// <exception cref="Exception">如果没有找到对应的组件</exception>
+        private T CheckNewGameObj<T>(GameObject go, string beanName) where T : MonoBehaviour
+        {
             // 如果T是BeanObject或AcrossScenesBeanObject且没有挂载，就挂载BeanObject或AcrossScenesBeanObject，否则报错
             var behaviour = go.GetComponent<T>();
             if (behaviour == null)
@@ -64,20 +139,80 @@ namespace EasyInject.Utils
         }
 
         /// <summary>
-        /// 删除一个持久化的Bean
+        /// 删除一个游戏物体Bean
         /// </summary>
         /// <param name="bean">Bean实例</param>
         /// <param name="beanName">Bean名字</param>
+        /// <param name="deleteGameObj">是否删除游戏物体</param>
+        /// <param name="t">延迟时间</param>
         /// <typeparam name="T">Bean类型</typeparam>
         /// <returns>是否删除成功</returns>
-        public bool DeletePersistBean<T>(T bean, string beanName = "") where T : MonoBehaviour
+        public bool DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)
+            where T : MonoBehaviour
         {
             if (bean == null) return false;
-            if (bean.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() == null) return false;
             var beanInfo = new BeanInfo(beanName, typeof(T));
             if (!_beans.ContainsKey(beanInfo)) return false;
             _beans.Remove(beanInfo);
-            UnityEngine.Object.Destroy(bean.gameObject);
+
+            if (!deleteGameObj)
+            {
+                // 如果不需要删除游戏物体，就只删除Bean
+                Object.Destroy(bean, t);
+            }
+            else
+            {
+                // 查找游戏物体上有没有其他的Bean组件（包括打了GameObjectBean特性的组件，以及继承了BeanObject的组件）
+                var otherBeans = bean.GetComponents<MonoBehaviour>().Where(monoBehaviour =>
+                    monoBehaviour.GetType().GetCustomAttribute<GameObjectBeanAttribute>() != null ||
+                    monoBehaviour.GetType().IsSubclassOf(typeof(BeanObject))).ToList();
+                foreach (var info in otherBeans.Select(beans => new BeanInfo(beans.name, beans.GetType()))
+                             .Where(info => _beans.ContainsKey(info)))
+                {
+                    _beans.Remove(info);
+                }
+
+                Object.Destroy(bean.gameObject, t);
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// 立即删除一个游戏物体Bean
+        /// </summary>
+        /// <param name="bean">Bean实例</param>
+        /// <param name="beanName">Bean名字</param>
+        /// <param name="deleteGameObj">是否删除游戏物体</param>
+        /// <typeparam name="T">Bean类型</typeparam>
+        /// <returns>是否删除成功</returns>
+        public bool DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false) where T : MonoBehaviour
+        {
+            if (bean == null) return false;
+            var beanInfo = new BeanInfo(beanName, typeof(T));
+            if (!_beans.ContainsKey(beanInfo)) return false;
+            _beans.Remove(beanInfo);
+            
+            if (!deleteGameObj)
+            {
+                // 如果不需要删除游戏物体，就只删除Bean
+                Object.DestroyImmediate(bean);
+            }
+            else
+            {
+                // 查找游戏物体上有没有其他的Bean组件（包括打了GameObjectBean特性的组件，以及继承了BeanObject的组件）
+                var otherBeans = bean.GetComponents<MonoBehaviour>().Where(monoBehaviour =>
+                    monoBehaviour.GetType().GetCustomAttribute<GameObjectBeanAttribute>() != null ||
+                    monoBehaviour.GetType().IsSubclassOf(typeof(BeanObject))).ToList();
+                foreach (var info in otherBeans.Select(beans => new BeanInfo(beans.name, beans.GetType()))
+                             .Where(info => _beans.ContainsKey(info)))
+                {
+                    _beans.Remove(info);
+                }
+
+                Object.DestroyImmediate(bean.gameObject);
+            }
+            
             return true;
         }
 
