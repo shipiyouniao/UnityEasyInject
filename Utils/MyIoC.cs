@@ -21,8 +21,6 @@ namespace EasyInject.Utils
 
         // 尚未注入字段的实例
         private readonly Dictionary<ShelvedInstance, HashSet<string>> _shelvedInstances = new();
-        
-        private string _scene;
 
         public MyIoC()
         {
@@ -247,18 +245,6 @@ namespace EasyInject.Utils
 
             return null;
         }
-        
-        /// <summary>
-        /// 针对场景初始化容器
-        /// </summary>
-        public void Init()
-        {
-            // 清空上一个场景的Bean
-            if(_scene != null) ClearBeans(_scene);
-
-            // 获取场景中需要注入的MonoBehaviour实例
-            InitGameObjectBean();
-        }
 
         /// <summary>
         /// 清空该场景的Bean
@@ -276,7 +262,7 @@ namespace EasyInject.Utils
                 {
                     if (!clearAcrossScenesBeans)
                         continue;
-                    
+
                     DeleteGameObjBeanImmediate(value as MonoBehaviour, beanInfo.Name, true);
                 }
                 else
@@ -300,10 +286,10 @@ namespace EasyInject.Utils
         /// <summary>
         /// 获取场景中需要注入的MonoBehaviour实例
         /// </summary>
-        private void InitGameObjectBean()
+        public void Init()
         {
             // 获得当前场景的名字
-            _scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
 
             // 获得场景上所有挂载了BeanObject的物体
             var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>()
@@ -321,19 +307,20 @@ namespace EasyInject.Utils
                     // 检查是不是PersistAcrossScenesAttribute，如果是就往场景列表中添加场景
                     if (beanObject.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() != null)
                     {
-                        var keys = _beans.Where(bean => bean.Key.Name == beanObject.name && bean.Value.Equals(beanObject))
+                        var keys = _beans.Where(bean =>
+                                bean.Key.Name == beanObject.name && bean.Value.Equals(beanObject))
                             .Select(bean => bean.Key).ToList();
-                        foreach (var key in keys.Where(key => !key.Scenes.Contains(_scene)))
+                        foreach (var key in keys.Where(key => !key.Scenes.Contains(scene)))
                         {
-                            key.Scenes.Add(_scene);
+                            key.Scenes.Add(scene);
                         }
                     }
-                    
+
                     continue;
                 }
 
                 // 不需要进行字段依赖注入，因为BeanObject本来就是空的
-                AddBean(beanObject.name, beanObject, _scene, false);
+                AddBean(beanObject.name, beanObject, scene, false);
             }
 
             // 获得场景上所有挂载了GameObjectBeanAttribute的物体
@@ -355,6 +342,15 @@ namespace EasyInject.Utils
                     ENameType.Custom => attribute.Name,
                     ENameType.ClassName => gameObjectBean.GetType().Name,
                     ENameType.GameObjectName => gameObjectBean.name,
+                    // 筛选出有BeanName特性的字段，然后获取字段的值
+                    ENameType.FieldValue => gameObjectBean
+                                                .GetType()
+                                                .GetFields(BindingFlags.Public | BindingFlags.NonPublic |
+                                                           BindingFlags.Instance)
+                                                .Where(field => field.GetCustomAttribute<BeanNameAttribute>() != null)
+                                                .Select(field => field.GetValue(gameObjectBean).ToString())
+                                                .FirstOrDefault() ??
+                                            string.Empty,
                     _ => string.Empty
                 };
 
@@ -365,16 +361,16 @@ namespace EasyInject.Utils
                     {
                         var keys = _beans.Where(bean => bean.Key.Name == name && bean.Value.Equals(gameObjectBean))
                             .Select(bean => bean.Key).ToList();
-                        foreach (var key in keys.Where(key => !key.Scenes.Contains(_scene)))
+                        foreach (var key in keys.Where(key => !key.Scenes.Contains(scene)))
                         {
-                            key.Scenes.Add(_scene);
+                            key.Scenes.Add(scene);
                         }
                     }
-                    
+
                     continue;
                 }
 
-                AddBean(name, gameObjectBean, _scene);
+                AddBean(name, gameObjectBean, scene);
             }
         }
 

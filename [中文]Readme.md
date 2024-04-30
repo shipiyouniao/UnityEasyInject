@@ -124,6 +124,12 @@ public class GlobalInitializer : MonoBehaviour
         // 每次进入场景都初始化IoC容器
         Instance.Init();
     }
+    
+    private void OnDestroy()
+    {
+        // 清除该场景的所有Bean
+        Instance.ClearBeans(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+    }
 }
 ```
 
@@ -135,9 +141,6 @@ IoC容器提供了六个方法：
 * `DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)`：删除一个游戏物体Bean。
 * `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`：立即删除一个游戏物体Bean。
 * `ClearBeans(...)`：清空对应场景下的Bean。
-
-***你不需要在`GlobalInitializer`脚本的`OnDestroy`生命周期钩子中手动调用`ClearBeans()`方法，
-因为`Init()`方法会自动清空上一个场景的Bean。***
 
 ### 2. 非游戏物体组件类对象
 
@@ -350,6 +353,7 @@ public class TestMonoBehaviour3 : MonoBehaviour
 * `Custom`：自定义名字，默认值，不需要您手动指定，一般用于脚本是单例的情况。
 * `ClassName`：使用类名作为Bean的名字，一般用于脚本的父类也是Bean的情况，通过类名使Bean唯一化，不推荐使用。
 * `GameObjectName`：使用物体的名字作为Bean的名字，一般用于一个脚本挂载在多个物体上的情况，通过物体名使Bean唯一化。
+* `FieldValue`：使用字段的值作为Bean的名字，需要在对应的字段上使用`[BeanName]`特性，一般用于一个脚本多次挂载在同一个物体上的情况，通过字段值使Bean唯一化。
 
 因此，如果您不想手动指定名字，或是想要动态地使用物体名作为名字，可以使用`ENameType`枚举。
 

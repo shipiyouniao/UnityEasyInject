@@ -46,6 +46,11 @@ namespace EasyInject.Attributes
         /// <summary>
         /// 通过物体名作为Bean名
         /// </summary>
-        GameObjectName
+        GameObjectName,
+        
+        /// <summary>
+        /// 通过字段的值作为Bean名
+        /// </summary>
+        FieldValue
     }
 }

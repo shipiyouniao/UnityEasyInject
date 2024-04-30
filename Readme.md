@@ -139,6 +139,12 @@ public class GlobalInitializer : MonoBehaviour
     {
         Instance.Init();
     }
+    
+    private void OnDestroy()
+    {
+        // Clear the Beans in the corresponding scene
+        Instance.ClearBeans(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+    }
 }
 ```
 
@@ -152,9 +158,6 @@ The IoC container provides six methods:
 * `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`：Delete a GameObject which is
   a Bean immediately, which is similar to the `DestroyImmediate` method.
 * `ClearBeans(...)`: Clear the Beans in the corresponding scene.
-
-***There is no need to use the `ClearBeans` method at the `OnDestroy` method of the `GlobalInitializer` script, as
-the `Init` method will automatically clear the Beans in the last scene.***
 
 ### 2. Non-GameObject Component Class Object
 
@@ -385,6 +388,9 @@ Another way to inject the Bean by name is to use the `ENameType` enumeration typ
   the parent class is Bean, we still do not recommend using it to make the Bean unique.
 * `GameObjectName`: Use the name of the GameObject as the name of the Bean. This selection is usually used when the
   script is attached to a few GameObjects at the same time, which is a good way to make the Bean unique.
+* `FieldValue`: Use the value of the field as the name of the Bean. You need to use `[BeanName]` attribute to mark the
+  field, and the value of the field will be used as the name of the Bean. This selection is usually used when the
+  script is attached to same GameObject for multiple times, and use the field value to make the Bean unique.
 
 ```csharp
 [GameObjectBean(ENameType.GameObjectName)]

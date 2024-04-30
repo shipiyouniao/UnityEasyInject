@@ -92,7 +92,7 @@ namespace EasyInject.Utils
         T GetBean<T>(string name = "") where T : class;
 
         /// <summary>
-        /// 针对场景初始化容器
+        /// 获取场景中需要注入的MonoBehaviour实例
         /// </summary>
         void Init();
         

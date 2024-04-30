@@ -21,5 +21,11 @@ namespace EasyInject.Controllers
             // 每次进入场景都初始化IoC容器
             Instance.Init();
         }
+
+        private void OnDestroy()
+        {
+            // 清除该场景的所有Bean
+            Instance.ClearBeans(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+        }
     }
 }
