@@ -92,8 +92,21 @@ namespace EasyInject.Utils
         T GetBean<T>(string name = "") where T : class;
 
         /// <summary>
-        /// 初始化IoC容器
+        /// 针对场景初始化容器
         /// </summary>
         void Init();
+        
+        /// <summary>
+        /// 清空该场景的Bean
+        /// </summary>
+        /// <param name="scene">场景名称</param>
+        /// <param name="clearAcrossScenesBeans">是否清空跨场景的Bean</param>
+        void ClearBeans(string scene = null, bool clearAcrossScenesBeans = false);
+        
+        /// <summary>
+        /// 清空该场景的Bean
+        /// </summary>
+        /// <param name="clearAcrossScenesBeans">是否清空跨场景的Bean</param>
+        void ClearBeans(bool clearAcrossScenesBeans);
     }
 }

@@ -20,7 +20,7 @@
         * [为场景添加一个作为Bean的物体](#34-为场景添加一个作为bean的物体)
         * [基于里氏替换原则的游戏物体组件类Bean](#35-基于里氏替换原则的游戏物体组件类bean)
         * [跨场景的Bean](#36-跨场景的bean)
-        * [删除一个游戏物体Bean](#37-删除一个游戏物体bean)
+        * [删除游戏物体Bean](#37-删除游戏物体bean)
 * [未来计划](#未来计划)
 * [联系方式](#联系方式)
 
@@ -49,7 +49,7 @@ Unity Easy Inject是一个Unity依赖注入（DI）框架，它可以帮助你�
 
 这样的做法虽然简单，但是当项目变得越来越大时，这样的做法就会变得越来越麻烦，并且耦合度也会变得越来越高。
 
-这个时候我们就会去寻找一种更好的解决方案，控制反转（IoC）就是其中之一。
+这个时候我们就会去寻找一种更好的解决方法，控制反转（IoC）就是其中之一。
 
 如果你使用过Zenject等依赖注入框架，你会发现，我们需要手动将类对象作为Bean注册到容器中，这样的做法会使得项目变得更加复杂，比如这样：
 
@@ -107,7 +107,7 @@ Package文件即可。
 
 ### 1. 启动IoC容器
 
-请把`EasyInject/Controllers`目录下的`GlobalInitializer`作为启动控制器，挂载在每一个场景下的启动物体上。
+建议把`EasyInject/Controllers`目录下的`GlobalInitializer`作为启动控制器，挂载在每一个场景下的启动物体上。
 
 如果启动控制器的启动时间不对，导致IoC容器没有启动，请把DefaultExecutionOrder特性的参数设置为一个更低的数字。
 
@@ -127,19 +127,23 @@ public class GlobalInitializer : MonoBehaviour
 }
 ```
 
-IoC容器提供了五个方法：
+IoC容器提供了六个方法：
 
 * `Init()`：在每个场景开始时初始化IoC容器，注册所有的Bean。
 * `GetBean<T>(string name = "")`：获取一个Bean，不填写名字则以空字符串作为名字。
 * `CreateGameObjectAsBean<T>(...)`：创建一个物体作为Bean，类似于Unity的`Instantiate`方法。
 * `DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)`：删除一个游戏物体Bean。
 * `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`：立即删除一个游戏物体Bean。
+* `ClearBeans(...)`：清空对应场景下的Bean。
+
+***你不需要在`GlobalInitializer`脚本的`OnDestroy`生命周期钩子中手动调用`ClearBeans()`方法，
+因为`Init()`方法会自动清空上一个场景的Bean。***
 
 ### 2. 非游戏物体组件类对象
 
 #### 2.1 注册对象
 
-普通对象会在场景开始时最先被注册为Bean，你不需要去亲自使用`new`关键字实例化对象。
+普通对象会在场景开始时最先被注册为Bean，一般情况下在程序结束前不会被销毁。因此你不需要去亲自使用`new`关键字实例化对象。
 
 使用特性进行Bean的注册，目前只提供`[Component]`特性进行注册。
 
@@ -521,15 +525,17 @@ public class TestAcrossScenes : MonoBehaviour
 }
 ```
 
-#### 3.7 删除一个游戏物体Bean
+#### 3.7 删除游戏物体Bean
 
 如果您想要删除一个游戏物体Bean，请不要直接使用`Destroy`方法，因为这样会导致容器中的Bean信息没有被删除。
 
 容器提供了`DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)`方法。
 
-与`Destroy`方法类似，其中，`bean`是您想要删除的Bean组件类，`beanName`是Bean的名字，`deleteGameObj`表示是否删除物体，`t`是延迟删除的时间。
+与`Destroy`方法类似，其中，`bean`是您想要删除的Bean组件类，`beanName`是Bean的名字，`deleteGameObj`表示是否删除物体，`t`
+是延迟删除的时间。
 
-此外，还提供了`DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`方法，立即删除一个游戏物体Bean，但不推荐使用，因为会降低性能。
+此外，还提供了`DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`
+方法，立即删除一个游戏物体Bean，但不推荐使用，因为会降低性能。
 
 ```csharp
 [GameObjectBean]
@@ -542,6 +548,16 @@ public class TestMonoBehaviour9 : MonoBehaviour
     }
 }
 ```
+
+如果您想删除某个场景下的所有Bean，可以使用`ClearBeans(...)`方法。
+
+该方法有如下几个重载：
+
+`ClearBeans(string scene = null, bool clearAcrossScenesBeans = false)`
+
+`ClearBeans(bool clearAcrossScenesBeans)`
+
+其中，`scene`是场景名，`clearAcrossScenesBeans`表示是否清空跨场景的Bean（会把游戏物体销毁掉）。
 
 ---
 

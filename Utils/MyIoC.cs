@@ -21,6 +21,17 @@ namespace EasyInject.Utils
 
         // 尚未注入字段的实例
         private readonly Dictionary<ShelvedInstance, HashSet<string>> _shelvedInstances = new();
+        
+        private string _scene;
+
+        public MyIoC()
+        {
+            // 注册自己
+            RegisterTypeAndParentsAndInterfaces(string.Empty, this, GetType());
+
+            // 注册非游戏物体Bean（一般会持续保留到程序结束）
+            InitNormalBean();
+        }
 
         /// <summary>
         /// 创建一个GameObject作为Bean
@@ -109,6 +120,9 @@ namespace EasyInject.Utils
         /// <exception cref="Exception">如果没有找到对应的组件</exception>
         private T CheckNewGameObj<T>(GameObject go, string beanName) where T : MonoBehaviour
         {
+            // 获得当前场景的名字
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
             // 如果T是BeanObject或AcrossScenesBeanObject且没有挂载，就挂载BeanObject或AcrossScenesBeanObject，否则报错
             var behaviour = go.GetComponent<T>();
             if (behaviour == null)
@@ -133,7 +147,7 @@ namespace EasyInject.Utils
                 throw new Exception($"Bean {beanName} already exists");
             }
 
-            AddBean(beanName, behaviour);
+            AddBean(beanName, behaviour, scene);
 
             return behaviour;
         }
@@ -151,7 +165,7 @@ namespace EasyInject.Utils
             where T : MonoBehaviour
         {
             if (bean == null) return false;
-            var beanInfo = new BeanInfo(beanName, typeof(T));
+            var beanInfo = new BeanInfo(beanName, bean.GetType());
             if (!_beans.ContainsKey(beanInfo)) return false;
             _beans.Remove(beanInfo);
 
@@ -174,7 +188,7 @@ namespace EasyInject.Utils
 
                 Object.Destroy(bean.gameObject, t);
             }
-            
+
             return true;
         }
 
@@ -186,13 +200,14 @@ namespace EasyInject.Utils
         /// <param name="deleteGameObj">是否删除游戏物体</param>
         /// <typeparam name="T">Bean类型</typeparam>
         /// <returns>是否删除成功</returns>
-        public bool DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false) where T : MonoBehaviour
+        public bool DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)
+            where T : MonoBehaviour
         {
             if (bean == null) return false;
-            var beanInfo = new BeanInfo(beanName, typeof(T));
+            var beanInfo = new BeanInfo(beanName, bean.GetType());
             if (!_beans.ContainsKey(beanInfo)) return false;
             _beans.Remove(beanInfo);
-            
+
             if (!deleteGameObj)
             {
                 // 如果不需要删除游戏物体，就只删除Bean
@@ -212,7 +227,7 @@ namespace EasyInject.Utils
 
                 Object.DestroyImmediate(bean.gameObject);
             }
-            
+
             return true;
         }
 
@@ -232,35 +247,64 @@ namespace EasyInject.Utils
 
             return null;
         }
-
+        
         /// <summary>
-        /// 初始化IoC容器
+        /// 针对场景初始化容器
         /// </summary>
         public void Init()
         {
-            // 清空IoC容器
-            var beansToKeep =
-                (from bean in _beans
-                    let type = bean.Value.GetType()
-                    where type.GetCustomAttribute<PersistAcrossScenesAttribute>() != null
-                    select bean).ToDictionary(bean => bean.Key, bean => bean.Value);
-            _beans.Clear();
-            foreach (var bean in beansToKeep)
-            {
-                _beans.Add(bean.Key, bean.Value);
-            }
+            // 清空上一个场景的Bean
+            if(_scene != null) ClearBeans(_scene);
 
-            _shelvedInstances.Clear();
-
-            InitNormalBean();
-            GetDefaultMonoBehaviourInfo();
+            // 获取场景中需要注入的MonoBehaviour实例
+            InitGameObjectBean();
         }
 
         /// <summary>
-        /// 获取场景中需要注入的MonoBehaviour实例数
+        /// 清空该场景的Bean
         /// </summary>
-        private void GetDefaultMonoBehaviourInfo()
+        /// <param name="scene">场景名称</param>
+        /// <param name="clearAcrossScenesBeans">是否清空跨场景的Bean</param>
+        public void ClearBeans(string scene = null, bool clearAcrossScenesBeans = false)
         {
+            scene ??= UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+            foreach (var (beanInfo, value) in _beans.Where(bean => bean.Key.Scenes.Contains(scene)).ToList())
+            {
+                // 如果要清空跨场景的Bean，要删除跨场景Bean的GameObject
+                if (value.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() != null)
+                {
+                    if (!clearAcrossScenesBeans)
+                        continue;
+                    
+                    DeleteGameObjBeanImmediate(value as MonoBehaviour, beanInfo.Name, true);
+                }
+                else
+                {
+                    _beans.Remove(beanInfo);
+                }
+            }
+
+            _shelvedInstances.Clear();
+        }
+
+        /// <summary>
+        /// 清空该场景的Bean
+        /// </summary>
+        /// <param name="clearAcrossScenesBeans">是否清空跨场景的Bean</param>
+        public void ClearBeans(bool clearAcrossScenesBeans)
+        {
+            ClearBeans(null, clearAcrossScenesBeans);
+        }
+
+        /// <summary>
+        /// 获取场景中需要注入的MonoBehaviour实例
+        /// </summary>
+        private void InitGameObjectBean()
+        {
+            // 获得当前场景的名字
+            _scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
             // 获得场景上所有挂载了BeanObject的物体
             var beanObjects = Resources.FindObjectsOfTypeAll<BeanObject>()
                 // 非运行时环境下，如果预制体也在场景中，会把场景中物件和预制体都找到导致重复，因此必须筛选出来
@@ -270,11 +314,26 @@ namespace EasyInject.Utils
 #endif
                 .ToList();
 
-            foreach (var beanObject in beanObjects.Where(beanObject =>
-                         !_beans.ContainsKey(new BeanInfo(beanObject.name, typeof(BeanObject)))))
+            foreach (var beanObject in beanObjects)
             {
+                if (_beans.ContainsKey(new BeanInfo(beanObject.name, typeof(BeanObject))))
+                {
+                    // 检查是不是PersistAcrossScenesAttribute，如果是就往场景列表中添加场景
+                    if (beanObject.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() != null)
+                    {
+                        var keys = _beans.Where(bean => bean.Key.Name == beanObject.name && bean.Value.Equals(beanObject))
+                            .Select(bean => bean.Key).ToList();
+                        foreach (var key in keys.Where(key => !key.Scenes.Contains(_scene)))
+                        {
+                            key.Scenes.Add(_scene);
+                        }
+                    }
+                    
+                    continue;
+                }
+
                 // 不需要进行字段依赖注入，因为BeanObject本来就是空的
-                AddBean(beanObject.name, beanObject, false);
+                AddBean(beanObject.name, beanObject, _scene, false);
             }
 
             // 获得场景上所有挂载了GameObjectBeanAttribute的物体
@@ -299,10 +358,23 @@ namespace EasyInject.Utils
                     _ => string.Empty
                 };
 
-                // 如果已经存在，就不再添加（一般是因为这是持久化的对象）
-                if (_beans.ContainsKey(new BeanInfo(name, gameObjectBean.GetType()))) continue;
+                if (_beans.ContainsKey(new BeanInfo(name, gameObjectBean.GetType())))
+                {
+                    // 检查是不是PersistAcrossScenesAttribute，如果是就往场景列表中添加场景
+                    if (gameObjectBean.GetType().GetCustomAttribute<PersistAcrossScenesAttribute>() != null)
+                    {
+                        var keys = _beans.Where(bean => bean.Key.Name == name && bean.Value.Equals(gameObjectBean))
+                            .Select(bean => bean.Key).ToList();
+                        foreach (var key in keys.Where(key => !key.Scenes.Contains(_scene)))
+                        {
+                            key.Scenes.Add(_scene);
+                        }
+                    }
+                    
+                    continue;
+                }
 
-                AddBean(name, gameObjectBean);
+                AddBean(name, gameObjectBean, _scene);
             }
         }
 
@@ -510,11 +582,12 @@ namespace EasyInject.Utils
         /// </remarks>
         /// <param name="name">Bean的名字</param>
         /// <param name="instance">Bean的实例</param>
+        /// <param name="scene">场景名称</param>
         /// <param name="startInject">是否立即注入</param>
-        private void AddBean<T>(string name, T instance, bool startInject = true)
+        private void AddBean<T>(string name, T instance, string scene, bool startInject = true)
             where T : MonoBehaviour
         {
-            RegisterTypeAndParentsAndInterfaces(name, instance, instance.GetType());
+            RegisterTypeAndParentsAndInterfaces(name, instance, instance.GetType(), scene);
 
             if (startInject)
             {
@@ -598,11 +671,12 @@ namespace EasyInject.Utils
         /// <param name="name">bean的名称</param>
         /// <param name="instance">bean的实例</param>
         /// <param name="type">bean的类型</param>
-        private void RegisterTypeAndParentsAndInterfaces(string name, object instance, Type type)
+        /// <param name="scene">场景名称</param>
+        private void RegisterTypeAndParentsAndInterfaces(string name, object instance, Type type, string scene = "")
         {
             name ??= string.Empty;
             // 注册自己
-            var beanInfo = new BeanInfo(name, type);
+            var beanInfo = new BeanInfo(name, type, scene);
 
             if (!_beans.TryAdd(beanInfo, instance))
             {
@@ -614,7 +688,7 @@ namespace EasyInject.Utils
             if (baseType != null && baseType != typeof(object) && baseType.Namespace != null &&
                 !baseType.Namespace.Contains("UnityEngine"))
             {
-                RegisterTypeAndParentsAndInterfaces(name, instance, baseType);
+                RegisterTypeAndParentsAndInterfaces(name, instance, baseType, scene);
             }
 
             // 注册接口
@@ -622,7 +696,7 @@ namespace EasyInject.Utils
             foreach (var @interface in interfaces)
             {
                 if (@interface.Namespace == null || @interface.Namespace.Contains("UnityEngine")) continue;
-                RegisterTypeAndParentsAndInterfaces(name, instance, @interface);
+                RegisterTypeAndParentsAndInterfaces(name, instance, @interface, scene);
             }
         }
     }

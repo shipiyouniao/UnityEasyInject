@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace EasyInject.Models
 {
@@ -10,11 +11,20 @@ namespace EasyInject.Models
     {
         public readonly string Name;
         public readonly Type Type;
+        // 会出现的场景，不作为比较的条件
+        public readonly List<string> Scenes = new();
 
         public BeanInfo(string name, Type type)
         {
             Name = name;
             Type = type;
+        }
+        
+        public BeanInfo(string name, Type type, string scene)
+        {
+            Name = name;
+            Type = type;
+            Scenes.Add(scene);
         }
 
         /// <summary>
@@ -35,6 +45,11 @@ namespace EasyInject.Models
         public override int GetHashCode()
         {
             return Name.GetHashCode() ^ Type.GetHashCode();
+        }
+
+        public override string ToString()
+        {
+            return $"BeanInfo: {Name} - {Type}";
         }
     }
 }

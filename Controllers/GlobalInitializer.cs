@@ -8,7 +8,7 @@ namespace EasyInject.Controllers
     /// description: 全局初始化器
     /// </summary>
     /// <remarks>
-    /// 这里必须要设置为最高优先级，因为要在场景加载前初始化，不然就会调用其他的Awake方法
+    /// 这里必须设置为最高优先级，因为要在场景加载前初始化，不然就会调用其他的Awake方法
     /// </remarks>
     [DefaultExecutionOrder(-1000000)] 
     public class GlobalInitializer : MonoBehaviour

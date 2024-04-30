@@ -122,7 +122,7 @@ Then in Unity, select `Assets` -> `Import Package` -> `Custom Package...`, and s
 
 ### 1. Start the IoC Container
 
-Please use `GlobalInitializer` in the `EasyInject/Controllers` directory as the startup controller and mount it on the
+We suggest you to use `GlobalInitializer` in the `EasyInject/Controllers` directory as the startup controller and mount it on the
 startup object in each scene.
 
 If the startup time of the startup controller is incorrect, causing the IoC container to not start, please set the
@@ -142,7 +142,7 @@ public class GlobalInitializer : MonoBehaviour
 }
 ```
 
-The IoC container provides five methods:
+The IoC container provides six methods:
 
 * `Init()`: Initialize the IoC container.
 * `GetBean<T>(string name = "")`: Get a Bean by name, if the name is not specified, an empty string will be used.
@@ -151,13 +151,17 @@ The IoC container provides five methods:
   which is a Bean, which is similar to the `Destroy` method.
 * `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)`：Delete a GameObject which is
   a Bean immediately, which is similar to the `DestroyImmediate` method.
+* `ClearBeans(...)`: Clear the Beans in the corresponding scene.
+
+***There is no need to use the `ClearBeans` method at the `OnDestroy` method of the `GlobalInitializer` script, as
+the `Init` method will automatically clear the Beans in the last scene.***
 
 ### 2. Non-GameObject Component Class Object
 
 #### 2.1 Register Object
 
-Non-GameObject component class objects will be registered first, which means you do not need to use `new` to create an
-instance of the object.
+Non-GameObject component class objects will be registered first and will not be destroyed until the game is closed,
+which means you do not need to use `new` to create an instance of the object.
 
 Please use attributes to mark the class as a Bean. Currently, only the `[Component]` feature is available for
 registration.
@@ -564,13 +568,19 @@ public class TestAcrossScenes : MonoBehaviour
 
 #### 3.7 Delete GameObject Component Class Bean
 
-If you need to delete a GameObject component class Bean, do not use the `Destroy` method directly, as the Bean will not be deleted from the container.
+If you need to delete a GameObject component class Bean, do not use the `Destroy` method directly, as the Bean will not
+be deleted from the container.
 
-You can use the `DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)` method provided by the container.
+You can use the `DeleteGameObjBean<T>(T bean, string beanName = "", bool deleteGameObj = false, float t = 0.0F)` method
+provided by the container.
 
-The method is quite similar to the `Destroy` method. `bean` is the instance of the component class, `beanName` is the name of the Bean, `deleteGameObj` is whether to delete the GameObject, and `t` is the delay time.
+The method is quite similar to the `Destroy` method. `bean` is the instance of the component class, `beanName` is the
+name of the Bean, `deleteGameObj` is whether to delete the GameObject, and `t` is the delay time.
 
-The container also provides the `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)` method, which is quite similar to the `DestroyImmediate` method. But we do not recommend using it, as it may reduce the performance of the game.
+The container also provides
+the `DeleteGameObjBeanImmediate<T>(T bean, string beanName = "", bool deleteGameObj = false)` method, which is quite
+similar to the `DestroyImmediate` method. But we do not recommend using it, as it may reduce the performance of the
+game.
 
 ```csharp
 [GameObjectBean]
@@ -583,6 +593,16 @@ public class TestMonoBehaviour9 : MonoBehaviour
     }
 }
 ```
+
+If you want to delete the Beans in the corresponding scene, you can use the `ClearBeans(...)` method provided by the container.
+
+There are many overloads of the method, you can choose the one that suits you best:
+
+`ClearBeans(string scene = null, bool clearAcrossScenesBeans = false)`
+
+`ClearBeans(bool clearAcrossScenesBeans)`
+
+`scene` is the name of the scene, `clearAcrossScenesBeans` is whether to clear the Beans across scenes(Which means the gameObject will also be destroyed).
 
 ---
 
